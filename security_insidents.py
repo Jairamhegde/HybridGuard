@@ -82,10 +82,8 @@ def generate_security_incidents():
    
 
     incidents_df = pd.read_sql_query("SELECT incident_type, severity, description FROM security_incidents ORDER BY severity ASC", conn)
-    # incidents_df.to_csv("reposr.csv",index=False)
+    incidents_df.to_csv("reposr.csv",index=False)
     # print(incidents_df.head(10)) # Shows the first 10 incidents
 
     conn.close()
-    
-
-print(generate_security_incidents())
+    return incidents_df

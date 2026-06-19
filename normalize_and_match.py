@@ -150,6 +150,7 @@ def main():
     relational_tables = transform_to_3nf(hr_df, aws_df, okta_df)
 
     load_to_database(relational_tables)
+    
 
 if __name__ == "__main__":
     main()
