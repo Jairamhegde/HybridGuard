@@ -68,9 +68,10 @@ def transform_to_3nf(hr_df, aws_df, okta_df):
     ])
 
     # Table 2: Human Identities
-    identities_df = hr_df[['name', 'email', 'status']].copy()
+    identities_df = hr_df[['user_id', 'name', 'email', 'status']].copy()
     identities_df.rename(columns={'name': 'full_name', 'status': 'hr_status'}, inplace=True)
     identities_df['identity_id'] = identities_df.index + 1 
+    identities_df['user_id'] = identities_df['user_id'].apply(lambda x: f"EMP{int(x):04d}")
     
     name_to_id = dict(zip(identities_df['full_name'], identities_df['identity_id']))
 
@@ -138,6 +139,12 @@ def transform_to_3nf(hr_df, aws_df, okta_df):
 
 def load_to_database(tables_dict):
     conn = connect_db()
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = OFF;")
+    for table_name in tables_dict.keys():
+        cursor.execute(f"DELETE FROM {table_name};")
+    cursor.execute("PRAGMA foreign_keys = ON;")
+    conn.commit()
     for table_name, dataframe in tables_dict.items():
         dataframe.to_sql(table_name, conn, if_exists='append', index=False)
     conn.close()

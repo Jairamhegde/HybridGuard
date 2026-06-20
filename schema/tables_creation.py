@@ -8,6 +8,7 @@ cur.execute("PRAGMA foreign_keys = ON;")
 huma_identity_table ="""
 CREATE TABLE IF NOT EXISTS human_identities (
     identity_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
     full_name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
     hr_status TEXT NOT NULL
