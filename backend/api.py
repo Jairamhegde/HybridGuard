@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from security_insidents import generate_security_incidents
+from backend.security_insidents import generate_security_incidents
 from fastapi.middleware.cors import CORSMiddleware
 
 myapp = FastAPI()
@@ -31,5 +31,17 @@ def root_data():
                 )
         return incidents
     return []
+
+@myapp.get('/damage_score')
+def damage_score():
+    df = damage_score()
+    return df
+
+@myapp.get('/dormancy_threat')
+def dorman_threat_score():
+    df = dorman_threat_score()
+    return df
+
+
 
 
