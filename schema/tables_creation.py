@@ -67,11 +67,66 @@ security_incidents = """
     );
     """
 
-cur.execute(huma_identity_table)
-cur.execute(platforms)
-cur.execute(accounts_table)
-cur.execute(role_defination_table)
-cur.execute(account_role_mapping)
-cur.execute(security_incidents)
+alter_table = '''
+alter table accounts
+add last_login_date DATETIME;
+'''
+
+table_audit = '''
+CREATE TABLE IF NOT EXISTS audit_events (
+    event_id TEXT PRIMARY KEY,
+    identity_id INTEGER,
+    platform TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    timestamp DATETIME NOT NULL,
+    source_ip TEXT,
+    resource_accessed TEXT,
+    status TEXT,
+    FOREIGN KEY (identity_id) REFERENCES human_identities(identity_id)
+);
+'''
+incidentce = ("""
+    CREATE TABLE IF NOT EXISTS security_incidents (
+        incident_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        identity_id INTEGER,
+        incident_type TEXT NOT NULL,
+        severity TEXT NOT NULL,
+        description TEXT NOT NULL,
+        status TEXT DEFAULT 'OPEN',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (identity_id) REFERENCES human_identities(identity_id)
+    );
+    """)
+
+previlageeed_watchlist =  '''
+    CREATE VIEW IF NOT EXISTS live_privileged_watchlist AS 
+    SELECT 
+        h.identity_id,
+        h.full_name AS identity_name,
+        h.hr_status,
+        MAX(r.normalized_tier) AS highest_tier_held,
+    
+        COALESCE(a.last_login_date, a.token_created_date) AS effective_last_activity,
+        CAST(julianday('now') - julianday(COALESCE(a.last_login_date, a.token_created_date)) AS INTEGER) AS days_dormant
+        
+    FROM human_identities h
+    JOIN accounts a ON h.identity_id = a.identity_id
+    JOIN account_role_mapping arm ON a.account_id = arm.account_id
+    JOIN role_definitions r ON arm.role_id = r.role_id
+    WHERE r.normalized_tier IN ('Tier 0', 'Tier 1')
+    AND a.account_status = 'ACTIVE'
+    GROUP BY h.identity_id;
+'''
+
+cur.execute(previlageeed_watchlist)
+# cur.execute(huma_identity_table)
+# cur.execute(platforms)
+# cur.execute(accounts_table)
+# cur.execute(role_defination_table)
+# cur.execute(account_role_mapping)
+# cur.execute(security_incidents)
+
+
+
 conn.commit()
 conn.close()

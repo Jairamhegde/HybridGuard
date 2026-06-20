@@ -1,23 +1,11 @@
 from backend.db_connection import connect_db
 import pandas as pd
+
+
+
 def generate_security_incidents():
     conn = connect_db()
     cursor = conn.cursor()
-
-    # 1. Create the Incidents Table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS security_incidents (
-        incident_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        identity_id INTEGER,
-        incident_type TEXT NOT NULL,
-        severity TEXT NOT NULL,
-        description TEXT NOT NULL,
-        status TEXT DEFAULT 'OPEN',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (identity_id) REFERENCES human_identities(identity_id)
-    );
-    """)
-    # Clear out old incidents so we don't duplicate them if we run the script twice
     cursor.execute("DELETE FROM security_incidents;") 
 
     ghost_account_query = """
@@ -32,14 +20,9 @@ def generate_security_incidents():
     JOIN platforms p ON a.platform_id = p.platform_id
     WHERE h.hr_status = 'DISABLED' AND a.account_status = 'ACTIVE';
     """
-    cursor.execute(ghost_account_query)
-    print(f"Detected {cursor.rowcount} Ghost Account violations.")
 
-    # ---------------------------------------------------------
-    # THREAT 2: PRIVILEGE CREEP (HIGH)
-    # Employee is a standard 'Tier 2' User, but holds 'Tier 0' or 'Tier 1' IT access
-    # ---------------------------------------------------------
-    privilege_creep_query = """
+    privilege_creep_query = \
+    """
     INSERT INTO security_incidents (identity_id, incident_type, severity, description)
     SELECT DISTINCT
         h.identity_id,
@@ -57,12 +40,7 @@ def generate_security_incidents():
     WHERE hr_role.normalized_tier = 'Tier 2' 
     AND sys_role.normalized_tier IN ('Tier 0', 'Tier 1');
     """
-    cursor.execute(privilege_creep_query)
 
-    # ---------------------------------------------------------
-    # THREAT 3: MISSING MFA / STALE TOKENS (MEDIUM)
-    # Account is active, but the token hasn't been rotated (is empty)
-    # ---------------------------------------------------------
     stale_token_query = """
     INSERT INTO security_incidents (identity_id, incident_type, severity, description)
     SELECT 
@@ -76,14 +54,72 @@ def generate_security_incidents():
     WHERE a.account_status = 'ACTIVE' 
     AND (a.token_rotated_date IS NULL OR a.token_rotated_date = '');
     """
-    cursor.execute(stale_token_query)
 
+    cursor.execute(ghost_account_query)
+    print(f"Detected {cursor.rowcount} Ghost Account violations.")
+    cursor.execute(privilege_creep_query)
+    cursor.execute(stale_token_query)
     conn.commit()
-   
 
     incidents_df = pd.read_sql_query("SELECT incident_type, severity, description FROM security_incidents ORDER BY severity ASC", conn)
-    incidents_df.to_csv("reposr.csv",index=False)
-    # print(incidents_df.head(10)) # Shows the first 10 incidents
 
     conn.close()
     return incidents_df
+
+def damage_score():
+    conn = connect_db()
+    cursor = conn.cursor()
+    damage_threat = '''
+        SELECT 
+        identity_id,
+        identity_name,
+        hr_status,
+        days_dormant,
+        highest_tier_held,
+        CASE 
+            WHEN hr_status = 'DISABLED' THEN 0
+            WHEN highest_tier_held = 'Tier 0' THEN 100
+            WHEN highest_tier_held = 'Tier 1' THEN 50
+            WHEN highest_tier_held = 'Tier 2' THEN 10
+            ELSE 0 
+        END AS damage_score
+        FROM live_privileged_watchlist
+        ORDER BY damage_score DESC, days_dormant DESC;
+    '''
+
+    
+    damage_score_df = pd.read_sql_query(damage_threat,conn)
+    print(f"Detected {len(damage_score_df)} Damage Threat violations.")
+    conn.commit()
+    return  damage_score_df
+
+def dormancy_threat():
+    conn = connect_db()
+    cursor = conn.cursor()
+    dormancy = '''
+        SELECT 
+        identity_id,
+        identity_name,
+        hr_status,
+        days_dormant,
+        highest_tier_held as highiest_privilage,
+        last_login_date,
+        CASE 
+            WHEN days_dormant is NULL THEN 100
+            WHEN days_dormant >= 90 THEN 100
+            WHEN days_dormant >= 60 THEN 50
+            WHEN days_dormant >= 30 THEN 10
+            ELSE 0 
+        END AS dormancy_score
+        FROM live_privileged_watchlist
+        ORDER BY dormancy_score DESC, days_dormant DESC;
+    '''
+
+    dormancy_df = pd.read_sql_query(dormancy,conn)
+    print(f"Detected {len(dormancy_df)} Dormancy Threat violations.")
+    conn.commit()
+    return dormancy_df
+
+
+
+
