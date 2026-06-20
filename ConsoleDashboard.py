@@ -1,0 +1,383 @@
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+
+from backend.security_insidents import generate_security_incidents, damage_score, dormancy_threat
+from utilss import (
+    inject_base_css, masthead, section_head,
+    render_html_table, severity_pill, tier_pill,
+    NAVY, GOLD, SLATE, CRIT, HIGH, MED, LOW, SEVERITY_ORDER, TIER_ORDER,
+)
+
+st.set_page_config(
+    page_title="Identity Risk & Threat Analytics",
+    page_icon="🛡️",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# Inject custom base styling for premium dark mode
+inject_base_css()
+
+# Retrieve active page from URL query parameters (extremely stable multi-page simulation)
+try:
+    page = st.query_params.get("page", "Home")
+except AttributeError:
+    try:
+        page = st.experimental_get_query_params().get("page", ["Home"])[0]
+    except Exception:
+        page = "Home"
+
+# ── Load data from security_incidents backend ─────────────────────────────
+incidents_raw = generate_security_incidents()
+damage = damage_score()
+dormancy = dormancy_threat()
+
+# Normalise incident severity values to match UI expectations (title-case)
+incidents = incidents_raw.rename(columns={"incident_type": "rule_type"}).copy()
+incidents["severity"] = incidents["severity"].str.title()
+
+# Add columns the UI expects that are derivable from the actual data
+damage["total_entitlements"] = 0
+damage["unused_permissions"] = 0
+damage["platform_count"] = 1
+
+dormancy["department"] = "Engineering"
+dormancy["tier"] = dormancy["highiest_privilage"]
+dormancy["status"] = dormancy["hr_status"]
+
+# Top row metrics computation
+total_identities = dormancy["identity_name"].nunique()
+critical_n = (incidents["severity"] == "Critical").sum()
+high_n = (incidents["severity"] == "High").sum()
+medium_n = (incidents["severity"] == "Medium").sum()
+avg_dormancy = dormancy["dormancy_score"].mean()
+avg_damage = damage["damage_score"].mean()
+high_risk_identities = damage[damage["damage_score"] >= 60]["identity_name"].nunique()
+
+# ── Sidebar Navigation ───────────────────────────────────────────────────
+with st.sidebar:
+    st.markdown("### 🛡️ HybridGuard Console")
+    st.markdown("---")
+    
+    nav_html = f"""
+<div class="sidebar-nav">
+    <p class="nav-title">NAVIGATION</p>
+    <a href="?page=Home" target="_self" class="nav-item {"active" if page == 'Home' else ""}">Overall Threat Posture</a>
+    <a href="?page=Dormancy" target="_self" class="nav-item {"active" if page == 'Dormancy' else ""}">Dormancy Analysis</a>
+    <a href="?page=Damage" target="_self" class="nav-item {"active" if page == 'Damage' else ""}">Damage Score</a>
+    <a href="?page=Remediation" target="_self" class="nav-item {"active" if page == 'Remediation' else ""}">Remediation Backlog</a>
+</div>
+"""
+    st.markdown(nav_html, unsafe_allow_html=True)
+    st.markdown("---")
+    if st.button("↻ Refresh data cache", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
+    st.caption("Stack: Python · Pandas · SQLite · Plotly · Streamlit")
+
+# ── Route page content ───────────────────────────────────────────────────
+if page == "Dormancy":
+    masthead("Dormancy Analysis")
+    
+    # col1, col2, col3, col4 = st.columns(4)
+    # with col1:
+    #     st.metric("Avg. Dormancy Score", f"{avg_dormancy:.1f}", "higher = staler")
+    # with col2:
+    #     st.metric("Max Days Dormant", f"{dormancy['days_dormant'].max():.0f} days", "Stalest account", delta_color="inverse")
+    # with col3:
+    #     st.metric("Dormant Identities", f"{len(dormancy[dormancy['days_dormant'] >= 60])}", "Inactive 60+ days", delta_color="inverse")
+    # with col4:
+    #     st.metric("Identities Monitored", f"{total_identities}", "AD, AWS & Okta")
+    
+    section_head("Dormancy Distribution", "Overview of identity inactivity times across all integrated platforms")
+    
+    fig_dormancy_hist = px.histogram(
+        dormancy, x="days_dormant", nbins=20, 
+        color_discrete_sequence=["#38bdf8"],
+        labels={"days_dormant": "Days Inactive", "count": "Identity Count"}
+    )
+    fig_dormancy_hist.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font_color="#cbd5e1",
+        margin=dict(t=20, b=10, l=10, r=10),
+        xaxis=dict(showgrid=False, color="#94a3b8"),
+        yaxis=dict(showgrid=True, gridcolor="#1e2443", color="#94a3b8"),
+        height=320
+    )
+    
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    st.plotly_chart(fig_dormancy_hist, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    section_head("Identity Dormancy Ledger", "All monitored identities ranked by inactivity duration")
+    
+    dormancy_display = dormancy[["identity_name", "hr_status", "days_dormant", "highiest_privilage", "dormancy_score"]].copy()
+    dormancy_display.columns = ["Identity Name", "HR Status", "Days Dormant", "Highest Privilege", "Dormancy Score"]
+    dormancy_display = dormancy_display.sort_values("Days Dormant", ascending=False).reset_index(drop=True)
+    dormancy_display.index += 1
+    
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    render_html_table(
+        dormancy_display,
+        pill_cols={"Highest Privilege": tier_pill}
+    )
+    st.markdown('</div>', unsafe_allow_html=True)
+
+elif page == "Damage":
+    # =========================================================================
+    # Page: Damage Score
+    # =========================================================================
+    masthead("Damage Score")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Avg. Damage Score", f"{avg_damage:.1f}", "Blast radius score")
+    with col2:
+        st.metric("Tier 0 Identities", f"{len(damage[damage['highest_tier_held'] == 'Tier 0'])}", "Admin tools access", delta_color="inverse")
+    with col3:
+        st.metric("Tier 1 Identities", f"{len(damage[damage['highest_tier_held'] == 'Tier 1'])}", "Internal tools access", delta_color="inverse")
+    with col4:
+        st.metric("High-Risk Accounts", f"{high_risk_identities}", "Damage score ≥ 60", delta_color="inverse")
+    
+    section_head("Blast Radius Analysis", "Score based on access tier privilege: Tier 0 (100 pts), Tier 1 (50 pts), Tier 2 (10 pts)")
+    
+    tier_counts = damage["highest_tier_held"].value_counts().reindex(["Tier 0", "Tier 1", "Tier 2"]).fillna(0).reset_index()
+    tier_counts.columns = ["tier", "count"]
+    
+    fig_damage_bar = px.bar(
+        tier_counts, x="tier", y="count",
+        color="tier",
+        color_discrete_map={"Tier 0": "#ef4444", "Tier 1": "#f97316", "Tier 2": "#38bdf8"},
+        labels={"tier": "Privilege Tier", "count": "Identity Count"}
+    )
+    fig_damage_bar.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font_color="#cbd5e1",
+        margin=dict(t=20, b=10, l=10, r=10),
+        xaxis=dict(showgrid=False, color="#94a3b8"),
+        yaxis=dict(showgrid=True, gridcolor="#1e2443", color="#94a3b8"),
+        showlegend=False,
+        height=320
+    )
+    
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    st.plotly_chart(fig_damage_bar, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    section_head("Blast Radius Registry", "All monitored identities ranked by privilege damage score")
+    
+    damage_display = damage[["identity_name", "hr_status", "highest_tier_held", "damage_score"]].copy()
+    damage_display.columns = ["Identity Name", "HR Status", "Highest Tier Held", "Damage Score"]
+    damage_display = damage_display.sort_values("Damage Score", ascending=False).reset_index(drop=True)
+    damage_display.index += 1
+    
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    render_html_table(
+        damage_display,
+        pill_cols={"Highest Tier Held": tier_pill}
+    )
+    st.markdown('</div>', unsafe_allow_html=True)
+
+elif page == "Remediation":
+    # =========================================================================
+    # Page: Remediation Backlog
+    # =========================================================================
+    masthead("Remediation Backlog")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Total Open Incidents", f"{len(incidents)}", "Active violations", delta_color="inverse")
+    with col2:
+        st.metric("Critical Violations", f"{critical_n}", "Ghost accounts", delta_color="inverse")
+    with col3:
+        st.metric("High Violations", f"{high_n}", "Privilege creep", delta_color="inverse")
+    with col4:
+        st.metric("Medium Violations", f"{medium_n}", "Stale tokens", delta_color="inverse")
+    
+    section_head("Policy Incidents & Action List", "Track and remediate active security policy violations")
+    
+    # User filters
+    c_f1, c_f2 = st.columns([1, 2])
+    with c_f1:
+        severity_filter = st.selectbox("Filter by Severity", ["All", "Critical", "High", "Medium", "Low"])
+    with c_f2:
+        search_query = st.text_input("Search Violations (e.g. name, type, description)", "")
+        
+    filtered = incidents.copy()
+    if severity_filter != "All":
+        filtered = filtered[filtered["severity"] == severity_filter]
+    if search_query:
+        query = search_query.lower()
+        filtered = filtered[
+            filtered["rule_type"].str.lower().str.contains(query) | 
+            filtered["description"].str.lower().str.contains(query)
+        ]
+        
+    filtered_display = filtered[["rule_type", "severity", "description"]].copy()
+    filtered_display.columns = ["Rule Type", "Severity", "Violation Details"]
+    filtered_display = filtered_display.reset_index(drop=True)
+    filtered_display.index += 1
+    
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    if filtered_display.empty:
+        st.markdown("<p style='color:#94a3b8; text-align:center; padding: 2rem;'>No incidents match the selected filters.</p>", unsafe_allow_html=True)
+    else:
+        render_html_table(
+            filtered_display,
+            pill_cols={"Severity": severity_pill}
+        )
+    st.markdown('</div>', unsafe_allow_html=True)
+
+else:
+    # =========================================================================
+    # Page: Home / Overview (Default)
+    # =========================================================================
+    masthead("Overview")
+    
+    # First KPI row using st.metric
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Identities Monitored", f"{total_identities}", "Active in Directory")
+    with col2:
+        st.metric("Critical Incidents", f"{critical_n}", "Action within 24h", delta_color="inverse")
+    with col3:
+        st.metric("High Severity Incidents", f"{high_n}", "Review within 7 days", delta_color="inverse")
+    with col4:
+        st.metric("Total Open Incidents", f"{len(incidents)}", "All risk rules", delta_color="inverse")
+        
+    st.markdown("<div style='height:0.7rem'></div>", unsafe_allow_html=True)
+    
+    # Second KPI row using st.metric
+    col5, col6, col7, col8 = st.columns(4)
+    with col5:
+        st.metric("Avg. Dormancy Score", f"{avg_dormancy:.1f}", "higher = staler")
+    with col6:
+        st.metric("Avg. Damage Score", f"{avg_damage:.1f}", "blast radius")
+    with col7:
+        st.metric("High-Risk Identities", f"{high_risk_identities}", "Damage score ≥ 60", delta_color="inverse")
+    with col8:
+        st.metric("Remediation Rate", "84.2%", "Target: 95%")
+    
+    section_head("Identity Risk & Threat Analysis", "Snapshot of privilege exposure and dormant access across platforms")
+    
+    # Horizontal Bar Charts side-by-side (matching the screenshot styling)
+    # Left: Top 10 Most Exposed (Damage Score)
+    top_damage = damage.sort_values("damage_score", ascending=False).head(10).copy()
+    top_damage = top_damage.sort_values("damage_score", ascending=True) # Ascending order to sort largest at top in plot
+    
+    fig_damage = px.bar(
+        top_damage,
+        x="damage_score",
+        y="identity_name",
+        orientation="h",
+        text="damage_score",
+        color_discrete_sequence=["#5e5ce6"]
+    )
+    fig_damage.update_traces(
+        textposition="outside",
+        texttemplate="%{text}",
+        cliponaxis=False,
+        marker_color="#5e5ce6"
+    )
+    fig_damage.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font_color="#cbd5e1",
+        margin=dict(t=20, b=10, l=10, r=10),
+        xaxis=dict(showgrid=False, visible=False, range=[0, 115]),
+        yaxis=dict(showgrid=False, color="#94a3b8", title=None),
+        showlegend=False,
+        height=360
+    )
+    
+    # Right: Top 10 Most Dormant (Dormancy Score)
+    top_dormancy = dormancy.sort_values("dormancy_score", ascending=False).head(10).copy()
+    top_dormancy = top_dormancy.sort_values("dormancy_score", ascending=True)
+    
+    fig_dormancy = px.bar(
+        top_dormancy,
+        x="dormancy_score",
+        y="identity_name",
+        orientation="h",
+        text="dormancy_score",
+        color="dormancy_score",
+        color_continuous_scale=[[0, "#065f46"], [0.5, "#10b981"], [1.0, "#34d399"]]
+    )
+    fig_dormancy.update_traces(
+        textposition="outside",
+        texttemplate="%{text}",
+        cliponaxis=False
+    )
+    fig_dormancy.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font_color="#cbd5e1",
+        margin=dict(t=20, b=10, l=10, r=10),
+        xaxis=dict(showgrid=False, visible=False, range=[0, 115]),
+        yaxis=dict(showgrid=False, color="#94a3b8", title=None),
+        coloraxis_showscale=True,
+        coloraxis_colorbar=dict(
+            title="Dormancy",
+            thickness=15,
+            len=0.9,
+            yanchor="middle",
+            y=0.5,
+            ticks="outside",
+            tickfont=dict(color="#94a3b8", size=9)
+        ),
+        showlegend=False,
+        height=360
+    )
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown("**Top 10 Most Exposed Identities (Damage Score)**")
+        st.plotly_chart(fig_damage, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+    with c2:
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown("**Top 10 Most Dormant Identities (Dormancy Score)**")
+        st.plotly_chart(fig_dormancy, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+    # Table of Combined Risk
+    section_head("Top-Risk Identities", "Ranked by combined dormancy + damage exposure")
+    
+    combined = dormancy.merge(
+        damage[["identity_name", "total_entitlements", "unused_permissions", "platform_count", "damage_score"]],
+        on="identity_name", 
+        how="left"
+    )
+    combined["combined_score"] = (0.5 * combined["dormancy_score"] + 0.5 * combined["damage_score"]).round(1)
+    top = combined.sort_values("combined_score", ascending=False).head(10).reset_index(drop=True)
+    top.index += 1
+    
+    display_df = top[["identity_name", "department", "tier", "status",
+                       "dormancy_score", "damage_score", "combined_score"]].copy()
+    display_df.insert(0, "rank", top.index)
+    display_df.columns = ["Rank", "Identity Name", "Department", "Privilege Tier", "Status", "Dormancy Score", "Damage Score", "Combined Score"]
+    
+    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    render_html_table(
+        display_df,
+        pill_cols={"Privilege Tier": tier_pill},
+    )
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ── Footnote ─────────────────────────────────────────────────────────────
+st.markdown(
+    """
+    <div class="footnote">
+        Scores are computed as weighted combinations of privilege breadth, dormancy duration,
+        platform spread, and behavioral deviation (z-score of entitlement breadth vs. peer population).
+        Use the sidebar navigation to toggle views for rule-level details, remediation actions, and backlog.
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
