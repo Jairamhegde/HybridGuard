@@ -105,7 +105,7 @@ previlageeed_watchlist =  '''
         h.full_name AS identity_name,
         h.hr_status,
         MAX(r.normalized_tier) AS highest_tier_held,
-    
+        MAX(a.last_login_date) AS last_login_date,
         COALESCE(a.last_login_date, a.token_created_date) AS effective_last_activity,
         CAST(julianday('now') - julianday(COALESCE(a.last_login_date, a.token_created_date)) AS INTEGER) AS days_dormant
         
@@ -113,7 +113,7 @@ previlageeed_watchlist =  '''
     JOIN accounts a ON h.identity_id = a.identity_id
     JOIN account_role_mapping arm ON a.account_id = arm.account_id
     JOIN role_definitions r ON arm.role_id = r.role_id
-    WHERE r.normalized_tier IN ('Tier 0', 'Tier 1')
+    WHERE r.normalized_tier IN ('Tier 0', 'Tier 1', 'Tier 2')
     AND a.account_status = 'ACTIVE'
     GROUP BY h.identity_id;
 '''

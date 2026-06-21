@@ -16,7 +16,7 @@ from utilss import (
 )
 
 st.set_page_config(
-    page_title="Identity Risk & Threat Analytics",
+    page_title="Identity Risk & Threat Dashboard",
     page_icon="",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -36,6 +36,7 @@ except AttributeError:
 incidents_raw, prevelage_df, ghost_acc, stale_token = generate_security_incidents()
 damage = damage_score()
 dormancy = dormancy_threat()
+risk_df = calculate_risk_score(damage, dormancy)
 
 no_of_incidents = len(incidents_raw)
 incidents = incidents_raw.rename(columns={"incident_type": "rule_type"}).copy()
@@ -365,6 +366,31 @@ elif page == "Remediation":
             key_prefix="violations_ad",
         )
         
+elif page == "Identities":
+    masthead("All Identities")
+    search_term = st.text_input("Search Identities by Name", "")
+    filtered_risk_df = risk_df.copy()
+    if search_term:
+        filtered_risk_df = filtered_risk_df[filtered_risk_df['identity_name'].str.lower().str.contains(search_term.lower())]
+    
+    inject_table_css()
+    render_data_table(
+        df=filtered_risk_df,
+        columns=[
+            {"label": "Identity ID",   "width": 0.8, "key": "identity_id",        "type": "text"},
+            {"label": "Identity",      "width": 2.2, "key": "identity_name",      "type": "text", "color": "#ffffff", "weight": "600", "prefix": " "},
+            {"label": "HR Status",     "width": 1.0, "key": "hr_status",          "type": "text"},
+            {"label": "Highest Tier",  "width": 1.2, "key": "highest_tier_held",  "type": "pill", "pill_fn": tier_pill},
+            {"label": "Days Dormant",  "width": 1.2, "key": "days_dormant",       "type": "text"},
+            {"label": "Risk Score",    "width": 1.0, "key": "risk_score",         "type": "score", "thresholds": {"high": 70, "medium": 40}},
+            {"label": "Damage Score",  "width": 1.0, "key": "damage_score",       "type": "score", "thresholds": {"high": 70, "medium": 40}},
+            {"label": "Dormancy Score","width": 1.0, "key": "dormancy_score",     "type": "text"},
+            {"label": "Risk Factors",  "width": 2.0, "key": "risk_factors",       "type": "text", "color": "#94a3b8"},
+        ],
+        key_prefix="risk_all",
+        height=550,
+    )
+
 else:
     high_damage_score_acc = len(damage[damage['damage_score'] >= 60])
     Dorminant_acc = len(dormancy[dormancy['days_dormant'] >= 60])
@@ -381,10 +407,8 @@ else:
         st.metric("Identities Monitored", f"{total_identities}", "Active in Directory")
 
     
-
     # masthead("Overview")
     section_head("Top 10 Risk Identities", "Ranked by unified risk score (privilege dormancy)")
-    risk_df = calculate_risk_score(damage_score(), dormancy_threat())
     
     top_risk = risk_df[:10].copy()
     
@@ -435,29 +459,3 @@ else:
         st.dataframe(ghost_acc)
         st.markdown("### Stale Token")
         st.dataframe(stale_token)
-
-if page == "Identities":
-    st.markdown("# All Identities")
-    inject_table_css()
-    def risk_detail_html(row):
-        return f"""
-        <div style="font-family:'Inter',sans-serif; color:#cbd5e1; font-size:0.85rem; line-height:1.6;">
-            <b style="color:#fff;">Full Risk Breakdown</b><br>
-            Highest Tier Held: {row.get('highest_tier_held','—')}<br>
-            Risk Factors: {row['risk_factors']}<br>
-            Damage Score: <span style="color:#ef4444; font-weight:700;">{row['damage_score']}</span> &nbsp;|&nbsp;
-            Dormancy Score: <span style="color:#f59e0b; font-weight:700;">{row['dormancy_score']}</span>
-        </div>
-        """
-    render_data_table(
-        df=risk_df,
-        columns=[
-            {"label": "Identity",  "width": 2.5, "key": "identity_name", "type": "text", "color": "#ffffff", "weight": "600", "prefix": " "},
-            {"label": "HR Status", "width": 1.3, "key": "hr_status",     "type": "text"},
-            {"label": "Risk",      "width": 1.0, "key": "risk_score",    "type": "score", "thresholds": {"high": 70, "medium": 40}},
-            {"label": "Damage",    "width": 1.0, "key": "damage_score",  "type": "score", "thresholds": {"high": 70, "medium": 40}},
-            {"label": "Dormancy",  "width": 1.0, "key": "dormancy_score","type": "text"},
-            {"label": "Factors",   "width": 2.0, "key": "risk_factors",  "type": "text", "color": "#94a3b8"},
-        ],
-        key_prefix="risk_all",
-    )

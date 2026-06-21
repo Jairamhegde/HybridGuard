@@ -24,24 +24,30 @@ def generate_security_incidents():
     
 
     privilege_creep_insert = """
-    INSERT INTO security_incidents (identity_id, incident_type, severity, platform, description,elevated_tier)
-    SELECT DISTINCT
-        h.identity_id,
-        'Privilege Creep' AS incident_type,
-        'HIGH' AS severity,
-        p.platform_name,
-        'User ' || h.full_name || ' is a standard ' || hr_role.normalized_tier || ' employee, but holds elevated ' || sys_role.normalized_tier || ' access (' || sys_role.raw_role_name || ') in ' || p.platform_name || '.' AS description,
-        sys_role.normalized_tier AS elevated_tier
-    FROM human_identities h
-    JOIN accounts hr_acc ON h.identity_id = hr_acc.identity_id AND hr_acc.platform_id = 1
-    JOIN account_role_mapping hr_map ON hr_acc.account_id = hr_map.account_id
-    JOIN role_definitions hr_role ON hr_map.role_id = hr_role.role_id
-    JOIN accounts sys_acc ON h.identity_id = sys_acc.identity_id AND sys_acc.platform_id != 1
-    JOIN account_role_mapping sys_map ON sys_acc.account_id = sys_map.account_id
-    JOIN role_definitions sys_role ON sys_map.role_id = sys_role.role_id
-    JOIN platforms p ON sys_acc.platform_id = p.platform_id
-    WHERE (hr_role.normalized_tier = 'Tier 2' AND sys_role.normalized_tier IN ('Tier 0', 'Tier 1'))
-       OR (hr_role.normalized_tier = 'Tier 1' AND sys_role.normalized_tier = 'Tier 0');
+    INSERT INTO security_incidents (identity_id, incident_type, severity, platform, description, elevated_tier)
+        SELECT DISTINCT
+            h.identity_id,
+            'Privilege Creep' AS incident_type,
+            'HIGH' AS severity,
+            p.platform_name,
+            'User ' || h.full_name || ' is a standard ' || hr_role.normalized_tier || ' employee, but holds elevated ' || sys_role.normalized_tier || ' access (' || sys_role.raw_role_name || ') in ' || p.platform_name || '.' AS description,
+            sys_role.normalized_tier AS elevated_tier
+        FROM human_identities h
+        JOIN accounts hr_acc ON h.identity_id = hr_acc.identity_id AND hr_acc.platform_id = 1
+        JOIN account_role_mapping hr_map ON hr_acc.account_id = hr_map.account_id
+        JOIN role_definitions hr_role ON hr_map.role_id = hr_role.role_id
+        JOIN accounts sys_acc ON h.identity_id = sys_acc.identity_id AND sys_acc.platform_id != 1
+        JOIN account_role_mapping sys_map ON sys_acc.account_id = sys_map.account_id
+        JOIN role_definitions sys_role ON sys_map.role_id = sys_role.role_id
+        JOIN platforms p ON sys_acc.platform_id = p.platform_id
+
+        WHERE hr_acc.account_status = 'ACTIVE' 
+        AND sys_acc.account_status = 'ACTIVE' 
+
+        AND (
+            (hr_role.normalized_tier = 'Tier 2' AND sys_role.normalized_tier IN ('Tier 0', 'Tier 1'))
+        OR (hr_role.normalized_tier = 'Tier 1' AND sys_role.normalized_tier = 'Tier 0')
+        );
     """
 
     stale_token_insert = """
@@ -198,10 +204,13 @@ def calculate_risk_score(damage_df, dormancy_df):
         on="identity_id",
         how="left"
     )
+    
     merged["risk_score"] = (
-        merged["damage_score"] * 0.5 +
-        merged["dormancy_score"] * 0.5
+        merged["damage_score"] * 0.4 +
+        merged["dormancy_score"] * 0.3 +
+        merged["hr_status"].apply(lambda status: 100.0 if status == "DISABLED" else 0.0) * 0.3
     )
+    
     merged["risk_factors"] = merged.apply(lambda row: ", ".join([
         f for f in [
             "high_privilege" if row["damage_score"] >= 50 else "",
@@ -209,6 +218,7 @@ def calculate_risk_score(damage_df, dormancy_df):
             "ghost_account" if row["hr_status"] == "DISABLED" else ""
         ] if f
     ]), axis=1)
+    
     merged = merged.sort_values("risk_score", ascending=False)
     return merged
 

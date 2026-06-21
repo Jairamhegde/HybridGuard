@@ -156,7 +156,7 @@ def transform_to_3nf(hr_df, aws_df, okta_df, ad_df, audit_df):
         'role_definitions': role_definitions_df,
         'account_role_mapping': mapping_df,
         'audit_events': audit_df  
-    }
+    }   
 # _____________________________LOAD_______________________________________________________
 def load_to_database(tables_dict):
     print("4. Loading data into the SQLite database...")
