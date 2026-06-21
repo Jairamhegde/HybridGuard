@@ -172,33 +172,39 @@ elif page == "Damage":
 
     section_head("Blast Radius Registry", "All monitored identities ranked by privilege damage score")
     top_damage = damage.sort_values("damage_score", ascending=False)
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
+    
+    def disable_status(row):
+        conn = connect_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE human_identities
+            SET hr_status = 'DISABLED'
+            WHERE identity_id = ?
+        """, (int(row['identity_id']),))
+        conn.commit()
+        conn.close()
+        st.toast(f"Status disabled for identity: {row['identity_name']} (ID: {row['identity_id']})")
+        st.rerun()
+
     if top_damage.empty:
         st.markdown("<p style='color:#94a3b8; font-family: Inter, sans-serif; padding: 1rem;'>✅ No high-risk accounts found in the registry.</p>", unsafe_allow_html=True)
     else:
-        for index, row in top_damage.iterrows():
-            with st.container(border=True):
-                col_info, col_action = st.columns([4, 1])
-                with col_info:
-                    pill_html = tier_pill(row['highest_tier_held'])
-                    card_text_html = f"""
-                    <div style="font-family: 'Inter', -apple-system, sans-serif; line-height: 1.4; padding-top: 0.2rem;">
-                        <div style="font-size: 1.15rem; font-weight: 700; color: #ffffff; margin-bottom: 0.4rem;">
-                            👤 {row['identity_name']}
-                        </div>
-                        <div style="font-size: 0.88rem; color: #94a3b8; display: flex; align-items: center; gap: 0.6rem;">
-                            {pill_html}
-                            <span style="color: #1e2443;">|</span>
-                            <span>Status: <span style="color: #cbd5e1; font-weight: 500;">{row['hr_status']}</span></span>
-                            <span style="color: #1e2443;">|</span>
-                            <span>Damage Score: <span style="color: #ef4444; font-weight: 700; font-size: 0.95rem;">{row['damage_score']}</span></span>
-                        </div>
-                    </div>
-                    """
-                    st.markdown(card_text_html, unsafe_allow_html=True)
-                with col_action:
-                    st.write("")
-    st.markdown('</div>', unsafe_allow_html=True)
+        inject_table_css()
+        render_data_table(
+            df=top_damage,
+            columns=[
+                {"label": "Identity ID",   "width": 1.0, "key": "identity_id", "type": "text"},
+                {"label": "Identity",      "width": 2.2, "key": "identity_name", "type": "text", "color": "#ffffff", "weight": "600", "prefix": "👤 "},
+                {"label": "HR Status",     "width": 1.2, "key": "hr_status", "type": "text"},
+                {"label": "Highest Tier",  "width": 1.5, "key": "highest_tier_held", "type": "pill", "pill_fn": tier_pill},
+                {"label": "Days Dormant",  "width": 1.2, "key": "days_dormant", "type": "text"},
+                {"label": "Damage Score",  "width": 1.3, "key": "damage_score", "type": "score", "thresholds": {"high": 70, "medium": 40}},
+            ],
+            actions=[
+                {"label": "DISABLE STATUS", "key_suffix": "dmg_inv", "width": 1.5, "on_click": disable_status},
+            ],
+            key_prefix="damage_registry",
+        )
 
 elif page == "Remediation":
 
@@ -282,9 +288,6 @@ elif page == "Remediation":
         conn.close()
         st.toast(f"Revoked all the tier :{row['elevated_tier']} for user: {row['identity_id']}")
         st.rerun()
-
-    
-  
 
     
 
@@ -384,8 +387,20 @@ else:
     risk_df = calculate_risk_score(damage_score(), dormancy_threat())
     
     top_risk = risk_df[:10].copy()
-    top_risk = risk_df[:10].copy()
-    top_risk = risk_df[:10].copy()
+    
+    def disable_status(row):
+        conn = connect_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE human_identities
+            SET hr_status = 'DISABLED'
+            WHERE identity_id = ?
+        """, (int(row['identity_id']),))
+        conn.commit()
+        conn.close()
+        st.toast(f"Status disabled for identity: {row['identity_name']} (ID: {row['identity_id']})")
+        st.rerun()
+
     inject_table_css()
     def risk_detail_html(row):
         return f"""
@@ -408,7 +423,7 @@ else:
             {"label": "Factors",   "width": 2.0, "key": "risk_factors",  "type": "text", "color": "#94a3b8"},
         ],
         actions=[
-            {"label": "DISABLE STATUS", "key_suffix": "inv", "width": 1.4, "on_click": lambda row: st.session_state.update(selected_identity=row['identity_name'])},
+            {"label": "DISABLE STATUS", "key_suffix": "inv", "width": 1.4, "on_click": disable_status},
         ],
         key_prefix="risk_top10",
     )
