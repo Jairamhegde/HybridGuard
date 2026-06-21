@@ -1,0 +1,779 @@
+================================================================================
+           HYBRIDGUARD — COMPLETE DATA FLOW ARCHITECTURE DOCUMENT
+================================================================================
+
+TABLE OF CONTENTS
+-----------------
+1.  OVERVIEW
+2.  INPUT CSV FILES (Source Data)
+    2.1 user_details.csv — HR Master Identity Data
+    2.2 ad_users.csv — Active Directory Accounts
+    2.3 aws_users.csv — AWS IAM Users
+    2.4 okta_users.csv — Okta Identity Users
+    2.5 audit_events.csv — Cross-Platform Audit Event Logs
+3.  ETL PIPELINE (normalize_and_match.py)
+    3.1 Step 1: Load CSVs
+    3.2 Step 2: Fuzzy Username Matching
+    3.3 Step 3: Transform to 3NF Relational Tables
+    3.4 Step 4: Load to SQLite Database
+4.  SQLITE DATABASE TABLES AND COLUMNS
+    4.1 human_identities
+    4.2 platforms
+    4.3 accounts
+    4.4 role_definitions
+    4.5 account_role_mapping
+    4.6 audit_events
+    4.7 security_incidents
+    4.8 live_privileged_watchlist (VIEW)
+5.  THREAT DETECTION & RISK SCORING
+    5.1 Ghost Accounts (CRITICAL)
+    5.2 Privilege Creep (HIGH)
+    5.3 Stale Security Tokens (MEDIUM)
+    5.4 damage_score() — Blast Radius Score
+    5.5 dormancy_threat() — Dormancy Score
+    5.6 calculate_risk_score() — Unified Risk Score
+6.  VISUALIZATION (Streamlit Dashboard)
+    6.1 Dashboard Pages
+    6.2 Complete Data Flow Diagram (Textual)
+7.  EXECUTION ENTRY POINTS
+8.  FILE DEPENDENCY CHART
+
+
+================================================================================
+1.  OVERVIEW
+================================================================================
+
+HybridGuard is an Identity Security Posture Management (ISPM) platform that:
+  - Ingests identity data from multiple sources (HR system, Active Directory,
+    AWS IAM, Okta) and cross-platform audit event logs
+  - Normalizes the flat CSV data into a 3NF (Third Normal Form) relational
+    SQLite database using fuzzy string matching to link records to canonical
+    HR identities
+  - Detects security threats: Ghost Accounts (disabled in HR but active on
+    platforms), Privilege Creep (users holding higher access than their HR
+    role justifies), and Stale Security Tokens (active accounts with no key
+    rotation)
+  - Computes risk scores: damage score (blast radius from privilege level),
+    dormancy score (inactivity duration), and a unified risk score
+  - Visualizes findings through a Streamlit dashboard with four pages:
+    Overview, Dormancy Analysis, Damage Score, and Remediation Backlog
+
+
+================================================================================
+2.  INPUT CSV FILES
+================================================================================
+
+All CSV files are stored in the csvs/ directory and defined as constants in
+utils/path.py:
+
+    AWS_DATA     = BASE_DIR/"csvs"/"aws_users.csv"
+    OKTA         = BASE_DIR/"csvs"/"okta_users.csv"
+    USER_DETAILS = BASE_DIR/"csvs"/"user_details.csv"
+    AUDIT_EVENTS = BASE_DIR/"csvs"/"audit_events.csv"
+    AD_USERS     = BASE_DIR/"csvs"/"ad_users.csv"
+
+------------------------------------------------------------------------
+2.1  user_details.csv — HR Master Identity Data (Primary Source of Truth)
+------------------------------------------------------------------------
+
+  +---------+-------------------+------------------------------------------+
+  | Column  | Description       | Sample Values                            |
+  +---------+-------------------+------------------------------------------+
+  |user_id  | Unique integer ID | 1, 2, 3 ... 250                          |
+  |name     | Full name         | Allison Hill, Noah Rhodes                |
+  |email    | Company email     | allison.hill1@company.com                |
+  |status   | HR status         | ACTIVE, DISABLED                         |
+  |role     | HR role/title     | User, Server Operator, Enterprise Admin  |
+  +---------+-------------------+------------------------------------------+
+
+  Rows: 250
+  This is the authoritative source of who the person is and their
+  employment status. All platform data is matched against this file.
+
+------------------------------------------------------------------------
+2.2  ad_users.csv — Active Directory Accounts
+------------------------------------------------------------------------
+
+  +-----------------+---------------------------+---------------------------+
+  | Column          | Description               | Sample Values             |
+  +-----------------+---------------------------+---------------------------+
+  |employee_id      | Numeric employee ID       | 1, 2, 3 ... 250           |
+  |sAMAccountName   | AD login username         | ahill, nrhodes            |
+  |userPrincipalName| UPN email login           | allison.hill1@company.com |
+  |ad_status        | Account status in AD      | ACTIVE, DISABLED          |
+  |ad_group         | AD group membership       | Domain Users, Domain      |
+  |                 | (determines privilege)    | Admins, Server Operators, |
+  |                 |                           | Account Operators         |
+  +-----------------+---------------------------+---------------------------+
+
+  Rows: 250
+  Represents the HR/AD platform (platform_id = 1). The ad_group column is
+  used as the raw role for privilege normalization.
+
+------------------------------------------------------------------------
+2.3  aws_users.csv — AWS IAM Users
+------------------------------------------------------------------------
+
+  +-----------------+---------------------------+---------------------------+
+  | Column          | Description               | Sample Values             |
+  +-----------------+---------------------------+---------------------------+
+  |userid           | Unique AWS user ID        | 10001, 10002 ... 10250    |
+  |username         | AWS IAM username          | allison.hill, nrhodes,    |
+  |                 | (often messy/fuzzy)       | angie_henderson63         |
+  |email            | Email address             | allison.hill1@company.com |
+  |status           | AWS account status        | ACTIVE, DISABLED          |
+  |role             | AWS IAM role/policy       | S3ReadOnly, IAMFullAccess,|
+  |                 |                           | ReadOnlyAccess, etc.      |
+  |tokenusage       | Token usage counter       | 50001, 50002 ...          |
+  |createdat        | Date account was created  | 2024-08-13, 2024-12-23    |
+  |rotatedat        | Date access key rotated   | 2026-02-25 (may be empty) |
+  +-----------------+---------------------------+---------------------------+
+
+  Rows: 250
+  Represents the AWS platform (platform_id = 2). The username field is
+  "messy" — it may contain underscores, dots, or abbreviations that need
+  fuzzy matching to the HR name.
+
+------------------------------------------------------------------------
+2.4  okta_users.csv — Okta Identity Users
+------------------------------------------------------------------------
+
+  +-----------------+---------------------------+---------------------------+
+  | Column          | Description               | Sample Values             |
+  +-----------------+---------------------------+---------------------------+
+  |userid           | Unique Okta user ID       | 20001, 20002 ... 20250    |
+  |username         | Okta username             | ahill, noah_rhodes71,     |
+  |                 | (often messy/fuzzy)       | henderson.a               |
+  |email            | Email address             | allison.hill1@company.com |
+  |status           | Okta account status       | ACTIVE, DISABLED          |
+  |role             | Okta application role     | User, Admin, SuperAdmin,  |
+  |                 |                           | ApplicationAdmin, etc.    |
+  |tokenusage       | Token usage counter       | 60001, 60002 ...          |
+  |createdat        | Date Okta user created    | 2026-05-09                |
+  |rotatedat        | Date credentials rotated  | 2025-11-08 (may be empty) |
+  |last login date  | Last login timestamp      | 2026-06-19                |
+  +-----------------+---------------------------+---------------------------+
+
+  Rows: 250
+  Represents the Okta platform (platform_id = 3). Also uses messy usernames
+  that require fuzzy matching.
+
+------------------------------------------------------------------------
+2.5  audit_events.csv — Cross-Platform Audit Event Logs
+------------------------------------------------------------------------
+
+  +-------------------+---------------------------+---------------------------+
+  | Column            | Description               | Sample Values             |
+  +-------------------+---------------------------+---------------------------+
+  |event_id           | Unique event ID           | 1, 2, 3 ... 750           |
+  |user_id            | Platform-specific user ID | 20204, 10023, 113         |
+  |username           | Username (messy)          | joseph.coleman, ethanada, |
+  |                   |                           | Julia Torres              |
+  |platform           | Source platform           | OKTA, AWS, AD             |
+  |event_type         | Type of event             | RESOURCE_ACCESS, LOGIN,   |
+  |                   |                           | PASSWORD_RESET,           |
+  |                   |                           | TOKEN_USED,               |
+  |                   |                           | PRIVILEGE_CHANGE,         |
+  |                   |                           | GROUP_ADDITION            |
+  |timestamp          | ISO 8601 timestamp        | 2026-04-18T10:41:00       |
+  |source_ip          | Source IP address         | 72.50.63.55               |
+  |resource_accessed  | Which resource targeted   | AD:GroupPolicy,           |
+  |                   |                           | S3:customer-data,         |
+  |                   |                           | VPN:Gateway,              |
+  |                   |                           | CRM:Records, AWS:IAM,     |
+  |                   |                           | Okta:AdminConsole         |
+  |previlage change   | Privilege change details  | Backup Operator, User,    |
+  |                   | (if applicable)           | GroupAdmin (may be empty) |
+  +-------------------+---------------------------+---------------------------+
+
+  Rows: 750
+  Used for two purposes:
+    1. Deriving the last_login_date per (identity_id, platform) by taking
+       the LATEST timestamp for each combination.
+    2. Loading into the audit_events table for potential analysis.
+
+
+================================================================================
+3.  ETL PIPELINE
+================================================================================
+
+The entire ETL pipeline is implemented in:  backend/normalize_and_match.py
+It is executed by calling main().
+
+------------------------------------------------------------------------
+3.1  Step 1: Load CSVs (load_and_match_data)
+------------------------------------------------------------------------
+
+  All 5 CSV files are read into pandas DataFrames:
+    hr_df    = pd.read_csv(USER_DETAILS)    # 250 rows
+    aws_df   = pd.read_csv(AWS_DATA)        # 250 rows
+    okta_df  = pd.read_csv(OKTA)            # 250 rows
+    ad_df    = pd.read_csv(AD_USERS)        # 250 rows
+    audit_df = pd.read_csv(AUDIT_EVENTS)    # 750 rows
+
+------------------------------------------------------------------------
+3.2  Step 2: Fuzzy Username Matching
+------------------------------------------------------------------------
+
+  The HR file is the ground truth. For each HR name, a set of pattern
+  variations is generated. For example, "John Smith" produces:
+    [johnsmith, smithjohn, jsmith, smithj, johns, sjohn, john, smith]
+
+  For every record in AWS, Okta, AD, and Audit CSVs, the username is:
+    1. Cleaned — lowercased, all non-alphabetic characters removed
+    2. Compared against HR name patterns using difflib.SequenceMatcher
+    3. If similarity ratio >= 0.80, the record is matched to that HR name
+
+  A new column 'matched_human' is added to each platform DataFrame
+  containing the matched HR name (or None if no match).
+
+  Functions involved:
+    - clean_username(text)      → removes non-alpha chars, lowercases
+    - generate_namepattern(name) → generates pattern variations
+    - get_identity(messy, patterns) → returns matched HR name or None
+
+------------------------------------------------------------------------
+3.3  Step 3: Transform to 3NF (transform_to_3nf)
+------------------------------------------------------------------------
+
+  The matched data is normalized into six relational tables.
+
+  3.3.1  platforms  (hard-coded)
+         ┌─────────────┬──────────┐
+         │ platform_id │ name     │
+         ├─────────────┼──────────┤
+         │ 1           │ AD       │
+         │ 2           │ AWS      │
+         │ 3           │ Okta     │
+         └─────────────┴──────────┘
+
+  3.3.2  human_identities  (from user_details.csv)
+         identity_id (auto), full_name, email, hr_status
+
+  3.3.3  last_login_dict  (computed from audit_events.csv)
+         For each (identity_id, platform) pair, the LATEST timestamp in
+         audit_events is stored.
+
+  3.3.4  accounts  (from ad_users.csv + aws_users.csv + okta_users.csv)
+         account_id (PK, format: "AD-1", "AWS-10001", "OKTA-20001"),
+         identity_id (FK), platform_id (FK), platform_username,
+         account_status, token_usage, token_created_date,
+         token_rotated_date, last_login_date (from audit)
+
+  3.3.5  role_definitions  (extracted from all platform roles)
+         role_id (auto), platform_id (FK), raw_role_name, normalized_tier
+         Each unique (platform_id, raw_role_name) combination is stored
+         once. The raw_role_name is normalized to a tier via normalize_role().
+
+  3.3.6  account_role_mapping  (links accounts to roles)
+         mapping_id (auto), account_id (FK), role_id (FK)
+
+  3.3.7  audit_events  (from audit_events.csv)
+         event_id (PK), identity_id (FK), platform, event_type,
+         timestamp, source_ip, resource_accessed, status
+
+  Role Normalization Function (normalize_role):
+    Tier 0 (Admin/Superuser):
+      admin, domain admins, enterprise admin, IAMFullAccess,
+      AdministratorAccess, SuperAdmin
+    Tier 1 (Elevated Access):
+      ApplicationAdmin, HelpDeskAdmin, Server Operators, EC2FullAccess,
+      InternalToolsAdmin
+    Tier 2 (Standard User):
+      user, domain users, backup operator, account operators,
+      ReadOnlyAccess, S3ReadOnly, S3FullAccess
+
+------------------------------------------------------------------------
+3.4  Step 4: Load to SQLite (load_to_database)
+------------------------------------------------------------------------
+
+  Each of the six DataFrames is written to hybridguard.db using:
+    dataframe.to_sql(table_name, conn, if_exists='replace', index=False)
+
+  The database file path is defined in utils/path.py as:
+    HYBRIDDB = BASE_DIR / "hybridguard.db"
+
+
+================================================================================
+4.  SQLITE DATABASE TABLES AND COLUMNS
+================================================================================
+
+The database schema is created by:  schema/tables_creation.py
+
+------------------------------------------------------------------------
+4.1  human_identities
+------------------------------------------------------------------------
+
+  +-------------+---------+----------------------------+------------------------+
+  | Column      | Type    | Constraints                | Description            |
+  +-------------+---------+----------------------------+------------------------+
+  | identity_id | INTEGER | PRIMARY KEY AUTOINCREMENT  | Unique person ID       |
+  | full_name   | TEXT    | NOT NULL                   | Full name from HR      |
+  | email       | TEXT    | UNIQUE NOT NULL            | Company email address  |
+  | hr_status   | TEXT    | NOT NULL                   | ACTIVE or DISABLED     |
+  +-------------+---------+----------------------------+------------------------+
+
+------------------------------------------------------------------------
+4.2  platforms
+------------------------------------------------------------------------
+
+  +-------------+---------+----------------------------+------------------------+
+  | Column      | Type    | Constraints                | Description            |
+  +-------------+---------+----------------------------+------------------------+
+  | platform_id | INTEGER | PRIMARY KEY AUTOINCREMENT  | 1=AD, 2=AWS, 3=Okta   |
+  |platform_name| TEXT    | UNIQUE NOT NULL            | 'AD', 'AWS', 'Okta'    |
+  +-------------+---------+----------------------------+------------------------+
+
+------------------------------------------------------------------------
+4.3  accounts
+------------------------------------------------------------------------
+
+  +-------------------+---------+----------------------------+------------------------+
+  | Column            | Type    | Constraints                | Description            |
+  +-------------------+---------+----------------------------+------------------------+
+  | account_id        | TEXT    | PRIMARY KEY                | Format: "AD-1",        |
+  |                   |         |                            | "AWS-10001", etc.      |
+  | identity_id       | INTEGER | FK → human_identities      | Links to the person    |
+  | platform_id       | INTEGER | FK → platforms             | Which platform         |
+  |platform_username  | TEXT    | NOT NULL                   | Username on platform   |
+  | account_status    | TEXT    | NOT NULL                   | ACTIVE / DISABLED      |
+  | token_usage       | INTEGER |                            | Times token was used   |
+  | token_created_date| DATE    |                            | When token was created |
+  | token_rotated_date| DATE    |                            | When token was rotated |
+  | last_login_date   | DATETIME|                            | Latest login from      |
+  |                   |         |                            | audit logs             |
+  +-------------------+---------+----------------------------+------------------------+
+
+------------------------------------------------------------------------
+4.4  role_definitions
+------------------------------------------------------------------------
+
+  +-----------------+---------+----------------------------+------------------------+
+  | Column          | Type    | Constraints                | Description            |
+  +-----------------+---------+----------------------------+------------------------+
+  | role_id         | INTEGER | PRIMARY KEY AUTOINCREMENT  | Unique role ID         |
+  | platform_id     | INTEGER | FK → platforms             | Which platform         |
+  | raw_role_name   | TEXT    | NOT NULL                   | Raw role from source   |
+  | normalized_tier | TEXT    | NOT NULL                   | Tier 0/1/2             |
+  +-----------------+---------+----------------------------+------------------------+
+
+  UNIQUE constraint on (platform_id, raw_role_name)
+
+------------------------------------------------------------------------
+4.5  account_role_mapping
+------------------------------------------------------------------------
+
+  +-----------+---------+----------------------------+------------------------+
+  | Column    | Type    | Constraints                | Description            |
+  +-----------+---------+----------------------------+------------------------+
+  | mapping_id| INTEGER | PRIMARY KEY AUTOINCREMENT  | Unique mapping ID      |
+  | account_id| TEXT    | FK → accounts              | Which account          |
+  | role_id   | INTEGER | FK → role_definitions      | Which role assigned    |
+  +-----------+---------+----------------------------+------------------------+
+
+  UNIQUE constraint on (account_id, role_id)
+
+------------------------------------------------------------------------
+4.6  audit_events
+------------------------------------------------------------------------
+
+  +-------------------+---------+----------------------------+------------------------+
+  | Column            | Type    | Constraints                | Description            |
+  +-------------------+---------+----------------------------+------------------------+
+  | event_id          | TEXT    | PRIMARY KEY                | Unique event ID        |
+  | identity_id       | INTEGER | FK → human_identities      | Person who triggered   |
+  | platform          | TEXT    | NOT NULL                   | AD, AWS, Okta          |
+  | event_type        | TEXT    | NOT NULL                   | LOGIN, PASSWORD_RESET, |
+  |                   |         |                            | RESOURCE_ACCESS, etc.  |
+  | timestamp         | DATETIME| NOT NULL                   | When event occurred    |
+  | source_ip         | TEXT    |                            | Source IP address      |
+  | resource_accessed | TEXT    |                            | Which resource         |
+  | status            | TEXT    |                            | Event status/outcome   |
+  +-------------------+---------+----------------------------+------------------------+
+
+------------------------------------------------------------------------
+4.7  security_incidents
+------------------------------------------------------------------------
+
+  Generated dynamically by generate_security_incidents() in
+  backend/security_insidents.py. Contents are REPLACED on each run
+  (DELETE all rows first, then INSERT fresh incidents).
+
+  +-------------+---------+----------------------------+------------------------+
+  | Column      | Type    | Constraints                | Description            |
+  +-------------+---------+----------------------------+------------------------+
+  | incident_id | INTEGER | PRIMARY KEY AUTOINCREMENT  | Unique incident ID     |
+  | identity_id | INTEGER | FK → human_identities      | Person involved        |
+  |incident_type| TEXT    | NOT NULL                   | Ghost Account,         |
+  |             |         |                            | Privilege Creep,       |
+  |             |         |                            | Stale Security Token   |
+  | severity    | TEXT    | NOT NULL                   | CRITICAL, HIGH, MEDIUM |
+  | description | TEXT    | NOT NULL                   | Human-readable details |
+  | status      | TEXT    | DEFAULT 'OPEN'             | OPEN / CLOSED          |
+  | created_at  | DATETIME| DEFAULT CURRENT_TIMESTAMP  | When generated         |
+  | platform    | TEXT    |                            | Which platform         |
+  +-------------+---------+----------------------------+------------------------+
+
+------------------------------------------------------------------------
+4.8  live_privileged_watchlist (VIEW, not a table)
+------------------------------------------------------------------------
+
+  Defined in schema/tables_creation.py. This VIEW computes, for every
+  identity that has an ACTIVE account with a Tier 0 or Tier 1 role:
+
+    - identity_id
+    - identity_name (full_name)
+    - hr_status
+    - highest_tier_held (MAX of all normalized tiers across all accounts)
+    - effective_last_activity (last_login_date if available, else
+      token_created_date)
+    - days_dormant (days since effective_last_activity, computed via
+      julianday arithmetic)
+
+  SQL Definition:
+    CREATE VIEW live_privileged_watchlist AS
+    SELECT
+        h.identity_id,
+        h.full_name AS identity_name,
+        h.hr_status,
+        MAX(r.normalized_tier) AS highest_tier_held,
+        COALESCE(a.last_login_date, a.token_created_date)
+          AS effective_last_activity,
+        CAST(julianday('now') - julianday(
+          COALESCE(a.last_login_date, a.token_created_date))
+        AS INTEGER) AS days_dormant
+    FROM human_identities h
+    JOIN accounts a ON h.identity_id = a.identity_id
+    JOIN account_role_mapping arm ON a.account_id = arm.account_id
+    JOIN role_definitions r ON arm.role_id = r.role_id
+    WHERE r.normalized_tier IN ('Tier 0', 'Tier 1')
+      AND a.account_status = 'ACTIVE'
+    GROUP BY h.identity_id;
+
+
+================================================================================
+5.  THREAT DETECTION & RISK SCORING
+================================================================================
+
+All threat detection and scoring logic is in:  backend/security_insidents.py
+
+------------------------------------------------------------------------
+5.1  Ghost Accounts (CRITICAL severity)
+------------------------------------------------------------------------
+
+  Logic: A person is DISABLED in HR (human_identities.hr_status = 'DISABLED')
+         but still has an ACTIVE account on at least one platform
+         (accounts.account_status = 'ACTIVE').
+
+  SQL: JOIN human_identities h → accounts a → platforms p
+       WHERE h.hr_status = 'DISABLED' AND a.account_status = 'ACTIVE'
+
+  Description example:
+    "User John Smith is marked DISABLED in HR, but still has an ACTIVE
+     AWS account."
+
+------------------------------------------------------------------------
+5.2  Privilege Creep (HIGH severity)
+------------------------------------------------------------------------
+
+  Logic: A person's HR-designated role (from human_identities, linked via
+         accounts on platform_id=1=AD) has a LOWER privilege tier than
+         the role they hold on another platform (AWS or Okta).
+
+         Conditions:
+           - HR role = Tier 2 AND platform role = Tier 0 or Tier 1
+           - HR role = Tier 1 AND platform role = Tier 0
+
+  SQL: Complex multi-JOIN across:
+       human_identities → accounts (HR/AD platform_id=1) →
+         account_role_mapping → role_definitions (HR roles)
+       JOIN accounts (non-HR platform) →
+         account_role_mapping → role_definitions (platform roles)
+
+  Description example:
+    "User John Smith is a standard Tier 2 employee, but holds elevated
+     Tier 0 access (Domain Admins) in AD."
+
+------------------------------------------------------------------------
+5.3  Stale Security Tokens (MEDIUM severity)
+------------------------------------------------------------------------
+
+  Logic: An ACTIVE account has no record of token rotation
+         (token_rotated_date IS NULL OR empty string).
+
+  SQL: JOIN accounts a → human_identities h → platforms p
+       WHERE a.account_status = 'ACTIVE'
+         AND (a.token_rotated_date IS NULL OR a.token_rotated_date = '')
+
+  Description example:
+    "Active AWS account for John Smith has no record of token rotation."
+
+------------------------------------------------------------------------
+5.4  damage_score() — Blast Radius Score
+------------------------------------------------------------------------
+
+  Reads from the live_privileged_watchlist VIEW.
+
+  Scoring formula per identity:
+    IF hr_status = 'DISABLED'       → 0  (already inactive)
+    ELSE IF highest_tier_held = 'Tier 0' → 100
+    ELSE IF highest_tier_held = 'Tier 1' → 50
+    ELSE IF highest_tier_held = 'Tier 2' → 10
+    ELSE → 0
+
+  The damage_score represents the potential blast radius if the identity's
+  credentials were compromised. Higher privilege = higher damage score.
+
+  Output columns: identity_id, identity_name, hr_status, days_dormant,
+                  highest_tier_held, damage_score
+
+------------------------------------------------------------------------
+5.5  dormancy_threat() — Dormancy Score
+------------------------------------------------------------------------
+
+  Reads from the live_privileged_watchlist VIEW.
+
+  Scoring formula based on days_dormant:
+    days_dormant IS NULL → 100  (no activity record at all)
+    days_dormant >= 90   → 100
+    days_dormant >= 60   → 50
+    days_dormant >= 30   → 10
+    else                 → 0
+
+  Output columns: identity_id, identity_name, hr_status, days_dormant,
+                  highiest_privilage, last_login_date, dormancy_score
+
+------------------------------------------------------------------------
+5.6  calculate_risk_score() — Unified Risk Score
+------------------------------------------------------------------------
+
+  Merges damage_score() and dormancy_threat() on identity_id.
+
+  Formula:
+    risk_score = (damage_score * 0.5) + (dormancy_score * 0.5)
+
+  Risk Factors (text labels):
+    - "high_privilege"   if damage_score >= 50
+    - "dormant_account"  if dormancy_score >= 50
+    - "ghost_account"    if hr_status == "DISABLED"
+
+  Output columns: identity_id, identity_name, hr_status, days_dormant,
+                  highest_tier_held, damage_score, dormancy_score,
+                  last_login_date, risk_score, risk_factors
+
+  Final sort: descending by risk_score
+
+
+================================================================================
+6.  VISUALIZATION (Streamlit Dashboard)
+================================================================================
+
+The dashboard is built with Streamlit and uses Plotly for charts, pandas
+for data manipulation, and custom HTML/CSS for the dark theme.
+
+Two dashboard variants exist:
+  - dashboard.py  (enhanced version with more features)
+  - newapp.py     (simpler/alternative version)
+
+Both import:
+  - backend/security_insidents.py  for data generation
+  - utilss.py                      for UI helpers, CSS, and components
+
+Note on configuration: st.set_page_config() is called in dashboard.py and
+newapp.py (the entry points), NOT in utilss.py. utilss.py is a shared
+utility module and cannot contain page configuration.
+
+------------------------------------------------------------------------
+6.1  Dashboard Pages
+------------------------------------------------------------------------
+
+  Page 1: Home / Overview (default)
+    - KPI metrics: Total Identities, Critical Incidents, High Incidents,
+                   Total Open Incidents
+    - Top 10 Risk Identities table (ranked by unified risk_score)
+      with columns: Identity Name, HR Status, Risk Score, Damage Score,
+                    Dormancy Score, Risk Factors
+    - Each row has a "DISABLE STATUS" action button
+    - Expandable sections showing raw dataframes for Privilege Creep,
+      Ghost Accounts, and Stale Tokens
+
+  Page 2: Dormancy Analysis
+    - KPI metrics: Avg Dormancy Score, Max Days Dormant, Dormant Identities
+                   (60+ days), Identities Monitored
+    - Dormancy Distribution histogram (days dormant)
+    - Dormancy Heatmap (Privilege Tier × HR Status, showing avg days dormant)
+    - Identity Dormancy Ledger table (all identities ranked by days dormant)
+
+  Page 3: Damage Score
+    - KPI metrics: Avg Damage Score, Tier 0 Count, Tier 1 Count,
+                   High-Risk Accounts (damage >= 60)
+    - Blast Radius bar chart (count of identities per tier)
+    - Blast Radius Registry (identity cards with tier pill and damage score)
+
+  Page 4: Remediation Backlog
+    - KPI metrics: Total Open Incidents, Critical, High, Medium counts
+    - Filterable incident table (by severity and search text)
+    - Incidents grouped by platform (AWS, Okta, AD) with severity pills
+      and "Remove" action buttons
+
+------------------------------------------------------------------------
+6.2  Complete Data Flow Diagram (Textual)
+------------------------------------------------------------------------
+
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                      CSV SOURCE FILES                          │
+    │                                                                 │
+    │  user_details.csv   ad_users.csv   aws_users.csv               │
+    │  okta_users.csv     audit_events.csv                            │
+    │                                                                 │
+    │  (5 files, ~1750 total rows)                                    │
+    └─────────────────────────┬───────────────────────────────────────┘
+                              │
+                              ▼
+    ┌─────────────────────────────────────────────────────────────────┐
+    │              ETL: normalize_and_match.py                       │
+    │                                                                 │
+    │  1. Load all CSVs into pandas DataFrames                       │
+    │  2. Clean & fuzzy-match usernames → HR identities              │
+    │     (SequenceMatcher, threshold ≥ 0.80)                        │
+    │  3. Transform flat data into 3NF tables:                       │
+    │     - platforms (3 rows, hardcoded)                            │
+    │     - human_identities (250 rows from user_details)            │
+    │     - accounts (750 rows from AD+AWS+Okta)                     │
+    │     - role_definitions (unique roles per platform)             │
+    │     - account_role_mapping (links accounts to roles)           │
+    │     - audit_events (750 rows)                                  │
+    │  4. Load all tables to SQLite (if_exists='replace')            │
+    │     using df.to_sql()                                          │
+    └─────────────────────────┬───────────────────────────────────────┘
+                              │
+                              ▼
+    ┌─────────────────────────────────────────────────────────────────┐
+    │              SQLite Database: hybridguard.db                   │
+    │                                                                 │
+    │  Tables:                                                        │
+    │    human_identities    platforms      accounts                  │
+    │    role_definitions    account_role_mapping                     │
+    │    audit_events        security_incidents                      │
+    │                                                                 │
+    │  View:                                                          │
+    │    live_privileged_watchlist                                    │
+    │    (Tier 0/1 identities with computed dormancy)                 │
+    └─────────────────────────┬───────────────────────────────────────┘
+                              │
+                              ▼
+    ┌─────────────────────────────────────────────────────────────────┐
+    │         ANALYSIS ENGINE: security_insidents.py                 │
+    │                                                                 │
+    │  generate_security_incidents():                                 │
+    │    - Queries DB for Ghost Accounts (CRITICAL)                  │
+    │    - Queries DB for Privilege Creep (HIGH)                     │
+    │    - Queries DB for Stale Tokens (MEDIUM)                      │
+    │    - Combines into incidents DataFrame                         │
+    │                                                                 │
+    │  damage_score():                                                │
+    │    - Queries live_privileged_watchlist                         │
+    │    - Assigns: Tier 0=100, Tier 1=50, Tier 2=10, DISABLED=0    │
+    │                                                                 │
+    │  dormancy_threat():                                             │
+    │    - Queries live_privileged_watchlist                         │
+    │    - Assigns: ≥90d=100, ≥60d=50, ≥30d=10, else=0              │
+    │                                                                 │
+    │  calculate_risk_score(damage_df, dormancy_df):                  │
+    │    - Merges on identity_id                                     │
+    │    - risk_score = (damage × 0.5) + (dormancy × 0.5)           │
+    │    - Tags risk factors as text                                 │
+    └─────────────────────────┬───────────────────────────────────────┘
+                              │
+                              ▼
+    ┌─────────────────────────────────────────────────────────────────┐
+    │           STREAMLIT DASHBOARD (dashboard.py)                   │
+    │                                                                 │
+    │  Imports: security_insidents.py, utilss.py                     │
+    │                                                                 │
+    │  Pages:                                                         │
+    │    ┌─ Home ─────────────────────────────────────────────────┐  │
+    │    │  KPI cards, Top 10 Risk Identities table               │  │
+    │    └────────────────────────────────────────────────────────┘  │
+    │    ┌─ Dormancy Analysis ────────────────────────────────────┐  │
+    │    │  KPI, histogram, heatmap, dormancy ledger              │  │
+    │    └────────────────────────────────────────────────────────┘  │
+    │    ┌─ Damage Score ─────────────────────────────────────────┐  │
+    │    │  KPI, blast radius chart, blast radius registry        │  │
+    │    └────────────────────────────────────────────────────────┘  │
+    │    ┌─ Remediation Backlog ──────────────────────────────────┐  │
+    │    │  KPI, filterable incident table by platform            │  │
+    │    └────────────────────────────────────────────────────────┘  │
+    └─────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+7.  EXECUTION ENTRY POINTS
+================================================================================
+
+  Script                           Purpose
+  ───────────────────────────────  ───────────────────────────────────────────
+  schema/tables_creation.py        Create database tables and the VIEW.
+                                   Run once during initial setup.
+
+  schema/clear_data.py             Delete all data from all tables while
+                                   preserving the schema.
+
+  backend/normalize_and_match.py   Run the full ETL pipeline:
+                                   CSV files → SQLite database.
+                                   Call main() to execute.
+
+  streamlit run dashboard.py       Launch the main Streamlit dashboard.
+  streamlit run newapp.py          Launch the alternative dashboard.
+
+  check_db.py                      Debug script that prints DataFrame columns
+                                   and counts CRITICAL incidents.
+
+
+================================================================================
+8.  FILE DEPENDENCY CHART
+================================================================================
+
+  utils/path.py
+    ├── defines file path constants (HYBRIDDB, CSV paths)
+    └── imported by:
+        ├── backend/db_connection.py
+        └── backend/normalize_and_match.py
+
+  backend/db_connection.py
+    ├── imports: utils/path.py
+    └── provides: connect_db() → sqlite3.Connection
+    └── imported by:
+        ├── backend/normalize_and_match.py
+        ├── backend/security_insidents.py
+        ├── schema/tables_creation.py
+        ├── schema/clear_data.py
+        └── utilss.py (via load_table)
+
+  backend/normalize_and_match.py
+    ├── imports: utils/path.py, backend/db_connection.py
+    ├── CSVs: user_details.csv, ad_users.csv, aws_users.csv,
+    │         okta_users.csv, audit_events.csv
+    └── produces: hybridguard.db (6 tables populated)
+
+  backend/security_insidents.py
+    ├── imports: backend/db_connection.py
+    ├── provides: generate_security_incidents(), damage_score(),
+    │            dormancy_threat(), calculate_risk_score()
+    └── consumed by: dashboard.py, newapp.py, check_db.py
+
+  utilss.py
+    ├── imports: backend/db_connection.py (via load_table)
+    ├── provides: inject_base_css(), masthead(), section_head(),
+    │            render_html_table(), render_data_table(),
+    │            severity_pill(), tier_pill(), kpi_card(),
+    │            load_table(), load_all(), inject_table_css()
+    └── consumed by: dashboard.py, newapp.py
+
+  dashboard.py  /  newapp.py
+    ├── imports: backend/security_insidents.py, utilss.py
+    └── These are the Streamlit entry points (contain st.set_page_config)
+
+================================================================================
+                        END OF DOCUMENT
+================================================================================

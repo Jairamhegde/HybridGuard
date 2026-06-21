@@ -118,7 +118,16 @@ previlageeed_watchlist =  '''
     GROUP BY h.identity_id;
 '''
 
-cur.execute(previlageeed_watchlist)
+
+
+
+alter_securitty_insident = """
+alter table security_incidents
+add column elevated_tier TEXT;
+"""
+
+# cur.execute ("delete from security_incidents;")
+cur.execute(alter_securitty_insident)
 # cur.execute(huma_identity_table)
 # cur.execute(platforms)
 # cur.execute(accounts_table)

@@ -25,7 +25,9 @@ def clear_all_data():
             "accounts",
             "role_definitions",
             "platforms",
-            "human_identities"
+            "human_identities",
+            "audit_events"
+            
         ]
         
         for table in tables:

@@ -157,7 +157,6 @@ def transform_to_3nf(hr_df, aws_df, okta_df, ad_df, audit_df):
         'account_role_mapping': mapping_df,
         'audit_events': audit_df  
     }
-
 # _____________________________LOAD_______________________________________________________
 def load_to_database(tables_dict):
     print("4. Loading data into the SQLite database...")
@@ -171,3 +170,5 @@ def main():
     hr_df, aws_df, okta_df, ad_df, audit_df = load_and_match_data()
     relational_tables = transform_to_3nf(hr_df, aws_df, okta_df, ad_df, audit_df)
     load_to_database(relational_tables)
+
+main()

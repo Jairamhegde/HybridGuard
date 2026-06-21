@@ -8,11 +8,12 @@ def generate_security_incidents():
     cursor.execute("DELETE FROM security_incidents;")
 
     ghost_account_insert = """
-    INSERT INTO security_incidents (identity_id, incident_type, severity, description)
+    INSERT INTO security_incidents (identity_id, incident_type, severity,platform, description)
     SELECT 
         h.identity_id,
         'Ghost Account' AS incident_type,
         'CRITICAL' AS severity,
+        p.platform_name,
         'User ' || h.full_name || ' is marked DISABLED in HR, but still has an ACTIVE ' || p.platform_name || ' account.' AS description
     FROM human_identities h
     JOIN accounts a ON h.identity_id = a.identity_id
@@ -20,13 +21,17 @@ def generate_security_incidents():
     WHERE h.hr_status = 'DISABLED' AND a.account_status = 'ACTIVE';
     """
 
+    
+
     privilege_creep_insert = """
-    INSERT INTO security_incidents (identity_id, incident_type, severity, description)
+    INSERT INTO security_incidents (identity_id, incident_type, severity, platform, description,elevated_tier)
     SELECT DISTINCT
         h.identity_id,
         'Privilege Creep' AS incident_type,
         'HIGH' AS severity,
-        'User ' || h.full_name || ' is a standard ' || hr_role.normalized_tier || ' employee, but holds elevated ' || sys_role.normalized_tier || ' access (' || sys_role.raw_role_name || ') in ' || p.platform_name || '.' AS description
+        p.platform_name,
+        'User ' || h.full_name || ' is a standard ' || hr_role.normalized_tier || ' employee, but holds elevated ' || sys_role.normalized_tier || ' access (' || sys_role.raw_role_name || ') in ' || p.platform_name || '.' AS description,
+        sys_role.normalized_tier AS elevated_tier
     FROM human_identities h
     JOIN accounts hr_acc ON h.identity_id = hr_acc.identity_id AND hr_acc.platform_id = 1
     JOIN account_role_mapping hr_map ON hr_acc.account_id = hr_map.account_id
@@ -40,11 +45,12 @@ def generate_security_incidents():
     """
 
     stale_token_insert = """
-    INSERT INTO security_incidents (identity_id, incident_type, severity, description)
+    INSERT INTO security_incidents (identity_id, incident_type, severity, platform, description)
     SELECT 
         h.identity_id,
         'Stale Security Token' AS incident_type,
         'MEDIUM' AS severity,
+        p.platform_name,
         'Active ' || p.platform_name || ' account for ' || h.full_name || ' has no record of token rotation.' AS description
     FROM accounts a
     JOIN human_identities h ON a.identity_id = h.identity_id
@@ -125,7 +131,7 @@ def generate_security_incidents():
     stale_token = pd.read_sql_query(stale_token_select, conn)
     incidents_df = pd.concat([prevelage_df, ghost_acc, stale_token], ignore_index=True)
     incidents_df = pd.read_sql_query(
-        "SELECT incident_type, severity, description FROM security_incidents ORDER BY severity ASC", conn
+        "SELECT identity_id,incident_type, severity,platform, description FROM security_incidents ORDER BY severity ASC", conn
     )
 
     conn.close()
@@ -186,6 +192,7 @@ def dormancy_threat():
 
 
 def calculate_risk_score(damage_df, dormancy_df):
+
     merged = damage_df.merge(
         dormancy_df[["identity_id", "dormancy_score", "last_login_date"]],
         on="identity_id",
@@ -204,3 +211,31 @@ def calculate_risk_score(damage_df, dormancy_df):
     ]), axis=1)
     merged = merged.sort_values("risk_score", ascending=False)
     return merged
+
+
+def get_all_details(identity_id):
+    conn = connect_db()
+    account_status = """
+    SELECT
+        h.identity_id,
+        h.full_name,
+        h.hr_status,
+        p.platform_name,
+        a.account_status,
+    FROM human_identities h
+    JOIN accounts a ON h.identity_id = a.identity_id
+    JOIN platforms p ON a.platform_id = p.platform_id
+    where h.identity_id = identity_id;
+    """
+ 
+
+
+
+    df = pd.read_sql_query(account_status, conn)
+    print(f"Detected {len(df)} All Identities.")
+    conn.commit()
+    conn.close()
+    return df
+
+
+generate_security_incidents()

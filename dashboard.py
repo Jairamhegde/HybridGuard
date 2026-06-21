@@ -1,6 +1,8 @@
+import sqlite3
 from streamlit import expander
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 import plotly.express as px
 import plotly.graph_objects as go
 from backend.db_connection import connect_db
@@ -39,13 +41,6 @@ no_of_incidents = len(incidents_raw)
 incidents = incidents_raw.rename(columns={"incident_type": "rule_type"}).copy()
 incidents["severity"] = incidents["severity"].str.title()
 
-damage["total_entitlements"] = 0
-damage["unused_permissions"] = 0
-damage["platform_count"] = 1
-
-dormancy["department"] = "Engineering"
-dormancy["tier"] = dormancy["highiest_privilage"]
-dormancy["status"] = dormancy["hr_status"]
 
 total_identities = dormancy["identity_name"].nunique()
 critical_n = (incidents["severity"] == "Critical").sum()
@@ -67,6 +62,7 @@ with st.sidebar:
             <a href="?page=Dormancy" target="_self" class="nav-item {"active" if page == 'Dormancy' else ""}">Dormancy Analysis</a>
             <a href="?page=Damage" target="_self" class="nav-item {"active" if page == 'Damage' else ""}">Damage Score</a>
             <a href="?page=Remediation" target="_self" class="nav-item {"active" if page == 'Remediation' else ""}">Remediation Backlog</a>
+            <a href="?page=Identities" target="_self" class="nav-item {"active" if page == 'Identities' else ""}">Identities</a>
         </div>
     """
     st.markdown(nav_html, unsafe_allow_html=True)
@@ -76,7 +72,9 @@ with st.sidebar:
         st.rerun()
 
 # ── Page Router ───────────────────────────────────────────────────────────
+
 if page == "Dormancy":
+
     masthead("Dormancy Analysis")
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -203,7 +201,9 @@ elif page == "Damage":
     st.markdown('</div>', unsafe_allow_html=True)
 
 elif page == "Remediation":
+
     masthead("Remediation Backlog")
+
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("Total Open Incidents", f"{len(incidents)}", "Active violations", delta_color="inverse")
@@ -214,7 +214,10 @@ elif page == "Remediation":
     with col4:
         st.metric("Medium Violations", f"{medium_n}", "Stale tokens", delta_color="inverse")
 
+
+
     section_head("Policy Incidents & Action List", "Track and remediate active security policy violations")
+
     c_f1, c_f2 = st.columns([1, 2])
     with c_f1:
         severity_filter = st.selectbox("Filter by Severity", ["All", "Critical", "High", "Medium"])
@@ -226,12 +229,64 @@ elif page == "Remediation":
         filtered = filtered[filtered["severity"] == severity_filter]
   
 
-    def remove_violation(row):
-        st.session_state['violations_df'] = st.session_state['violations_df'][
-            st.session_state['violations_df']['description'] != row['description']
-        ]
+    def revoke_acces(row):
+        conn = connect_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE accounts 
+            SET account_status = 'DISABLED' 
+            WHERE identity_id = ?
+            AND platform_id = (SELECT platform_id FROM platforms WHERE platform_name = ?)
+        """, (row['identity_id'], row['platform'])) # Notice lowercase keys based on your config
+
+        cursor.execute("""
+            DELETE FROM security_incidents 
+            WHERE incident_type = ? AND platform = ? AND identity_id = ?
+        """, (row['rule_type'], row['platform'], row['identity_id']))
+        conn.commit()
+        conn.close()
+
+        st.toast(f"User status disabled {row['rule_type']} for ID: {row['identity_id']} in {row['platform']}.")
         st.rerun()
-        
+
+
+    def rotate_tockens(row):
+        conn = connect_db()
+        cur = conn.cursor()
+        query = '''
+        update accounts
+        set token_rotated_date = datetime("now")
+        where identity_id = ? AND platform_id = (SELECT platform_id FROM platforms WHERE platform_name = ?)
+        '''
+        cur.execute(query,(row['identity_id'], row['platform']))
+        conn.commit()
+        conn.close()
+        st.toast(f"Token rotated for user: {row['identity_id']}")
+        st.rerun()
+
+    def revoke_tier(row):
+        conn = connect_db()
+        cur = conn.cursor()
+        query = """
+            DELETE FROM account_role_mapping
+            WHERE account_id = (
+                SELECT account_id FROM accounts 
+                WHERE identity_id = ? AND platform_id = (SELECT platform_id FROM platforms WHERE platform_name = ?)
+            )
+            AND role_id IN (
+                SELECT role_id FROM role_definitions WHERE normalized_tier = ?
+            )
+        """
+        cur.execute(query,(row["identity_id"], row["platform"], row["elevated_tier"]))
+        conn.commit()
+        conn.close()
+        st.toast(f"Revoked all the tier :{row['elevated_tier']} for user: {row['identity_id']}")
+        st.rerun()
+
+    
+  
+
+    
 
     inject_table_css()
     if search_query:
@@ -241,25 +296,72 @@ elif page == "Remediation":
             filtered["description"].str.lower().str.contains(query)
         ]
 
+    def handle_remediation(row):
+        severity = row['severity'].upper()
+        if severity == "CRITICAL":
+            revoke_acces(row)    
+        elif severity == "HIGH":
+            revoke_tier(row)     
+        elif severity == "MEDIUM":
+            rotate_tockens(row)
+   
     if filtered.empty:
         st.markdown("<p style='color:#94a3b8; text-align:center; padding: 2rem;'>No incidents match the selected filters.</p>", unsafe_allow_html=True)
     else:
+        button_name = {
+            "CRITICAL": "Disable User",
+            "HIGH": "Revoke Access",
+            "MEDIUM": "Rotate Token"
+        }
+        
+        section_head("AWS", "Track and remediate active security policy violations")
         render_data_table(
-            df=filtered,
+            df=filtered[filtered['platform'] == "AWS"],
             columns=[
                 {"label": "Rule Type",         "width": 1.5, "key": "rule_type",   "type": "text", "color": "#ffffff", "weight": "600"},
+                {"label": "Identity id",          "width": 1.0, "key": "identity_id",    "type": "text", "color": "#94a3b8"},
                 {"label": "Severity",          "width": 1.0, "key": "severity",    "type": "pill", "pill_fn": severity_pill},
                 {"label": "Violation Details", "width": 3.5, "key": "description", "type": "text", "color": "#94a3b8"},
+                {"label": "Platform",          "width": 1.0, "key": "platform",    "type": "text", "color": "#94a3b8"},   
+
             ],
             actions=[
-                {"label": "Remove", "key_suffix": "remove", "width": 1.0, "on_click": lambda  : None},
+                {"label":lambda row: button_name.get(row['severity'].upper(), "Remove"), "key_suffix": "remove", "width": 1.0, "on_click":handle_remediation},
             ],
-            key_prefix="violations",
+            key_prefix="violations_aws",
+        )
+        section_head("Okta", "Track and remediate active security policy violations")
+        render_data_table(
+            df=filtered[filtered['platform'] == "Okta"],
+            columns=[
+                {"label": "Rule Type",         "width": 1.5, "key": "rule_type",   "type": "text", "color": "#ffffff", "weight": "600"},
+                {"label": "Identity id",          "width": 1.0, "key": "identity_id",    "type": "text", "color": "#94a3b8"},
+                {"label": "Severity",          "width": 1.0, "key": "severity",    "type": "pill", "pill_fn": severity_pill},
+                {"label": "Violation Details", "width": 3.5, "key": "description", "type": "text", "color": "#94a3b8"},
+                {"label": "Platform",          "width": 1.0, "key": "platform",    "type": "text", "color": "#94a3b8"},
+            ],
+            actions=[
+                {"label": lambda row: button_name.get(row['severity'].upper(), "Remove"), "key_suffix": "remove", "width": 1.0, "on_click": revoke_acces},
+            ],
+            key_prefix="violations_okta",
+        )
+
+        section_head("AD", "Track and remediate active security policy violations")
+        render_data_table(
+            df=filtered[filtered['platform'] == "AD"],
+            columns=[
+                {"label": "Rule Type",         "width": 1.5, "key": "rule_type",   "type": "text", "color": "#ffffff", "weight": "600"},
+                {"label": "Identity id",          "width": 1.0, "key": "identity_id",    "type": "text", "color": "#94a3b8"},
+                {"label": "Severity",          "width": 1.0, "key": "severity",    "type": "pill", "pill_fn": severity_pill},
+                {"label": "Violation Details", "width": 3.5, "key": "description", "type": "text", "color": "#94a3b8"},
+                {"label": "Platform",          "width": 1.0, "key": "platform",    "type": "text", "color": "#94a3b8"},
+            ],
+            actions=[
+                {"label":lambda row: button_name.get(row['severity'].upper(), "Remove"), "key_suffix": "remove", "width": 1.0, "on_click": revoke_acces},
+            ],
+            key_prefix="violations_ad",
         )
         
-
-        
-
 else:
     high_damage_score_acc = len(damage[damage['damage_score'] >= 60])
     Dorminant_acc = len(dormancy[dormancy['days_dormant'] >= 60])
@@ -319,4 +421,28 @@ else:
         st.markdown("### Stale Token")
         st.dataframe(stale_token)
 
-    
+if page == "Identities":
+    st.markdown("# All Identities")
+    inject_table_css()
+    def risk_detail_html(row):
+        return f"""
+        <div style="font-family:'Inter',sans-serif; color:#cbd5e1; font-size:0.85rem; line-height:1.6;">
+            <b style="color:#fff;">Full Risk Breakdown</b><br>
+            Highest Tier Held: {row.get('highest_tier_held','—')}<br>
+            Risk Factors: {row['risk_factors']}<br>
+            Damage Score: <span style="color:#ef4444; font-weight:700;">{row['damage_score']}</span> &nbsp;|&nbsp;
+            Dormancy Score: <span style="color:#f59e0b; font-weight:700;">{row['dormancy_score']}</span>
+        </div>
+        """
+    render_data_table(
+        df=risk_df,
+        columns=[
+            {"label": "Identity",  "width": 2.5, "key": "identity_name", "type": "text", "color": "#ffffff", "weight": "600", "prefix": " "},
+            {"label": "HR Status", "width": 1.3, "key": "hr_status",     "type": "text"},
+            {"label": "Risk",      "width": 1.0, "key": "risk_score",    "type": "score", "thresholds": {"high": 70, "medium": 40}},
+            {"label": "Damage",    "width": 1.0, "key": "damage_score",  "type": "score", "thresholds": {"high": 70, "medium": 40}},
+            {"label": "Dormancy",  "width": 1.0, "key": "dormancy_score","type": "text"},
+            {"label": "Factors",   "width": 2.0, "key": "risk_factors",  "type": "text", "color": "#94a3b8"},
+        ],
+        key_prefix="risk_all",
+    )

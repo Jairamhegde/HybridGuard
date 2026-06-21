@@ -1,12 +1,3 @@
-"""
-utils.py
---------
-Shared helpers used across every page of the dashboard:
- - cached SQLite access
- - the classic / professional CSS theme
- - small reusable HTML components (KPI cards, severity pills, section headers)
-"""
-
 import os
 import sqlite3
 import pandas as pd
@@ -27,15 +18,11 @@ TIER_COLORS = {
     "Tier2": "#3a5a78",
 }
 
-
-
 def load_table(name: str) -> pd.DataFrame:
     conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql(f"SELECT * FROM {name}", conn)
     conn.close()
     return df
-
-
 
 def load_all():
     return {
@@ -43,7 +30,6 @@ def load_all():
         "damage": load_table("damage"),
         "incidents": load_table("incidents"),
     }
-
 
 def inject_base_css():
     st.markdown(
@@ -326,7 +312,6 @@ def inject_base_css():
         unsafe_allow_html=True,
     )
 
-
 def masthead(page_label: str):
     st.markdown(
         f"""
@@ -344,7 +329,6 @@ def masthead(page_label: str):
         unsafe_allow_html=True,
     )
 
-
 def section_head(title: str, note: str = ""):
     st.markdown(
         f"""
@@ -353,7 +337,6 @@ def section_head(title: str, note: str = ""):
         """,
         unsafe_allow_html=True,
     )
-
 
 def kpi_card(label, value, foot="", accent="navy"):
     accent_class = f"accent-{accent}" if accent != "navy" else ""
@@ -370,23 +353,22 @@ def kpi_card(label, value, foot="", accent="navy"):
 
     return f'<div class="kpi-card {accent_class}"><div class="kpi-label">{label}</div><div class="kpi-value">{value}</div>{foot_html}</div>'
 
-
 def kpi_row(cards_html: list):
     st.markdown(f'<div class="kpi-row">{"".join(cards_html)}</div>', unsafe_allow_html=True)
-
 
 def severity_pill(sev: str) -> str:
     color = SEVERITY_COLORS.get(sev, "#4a5568")
     return f'<span class="pill" style="background:{color}">{sev.upper()}</span>'
-
 
 def tier_pill(tier: str) -> str:
     color = TIER_COLORS.get(tier, "#4a5568")
     return f'<span class="pill" style="background:{color}">{tier}</span>'
 
 
-def render_html_table(df: pd.DataFrame, pill_cols=None, max_rows=None):
-    """Render a DataFrame as a classic bordered HTML table styled for the premium dark mode."""
+def render_html_table(df: pd.DataFrame, pill_cols=None, max_rows=None, height: int = 400):
+    """Render a DataFrame as a classic bordered HTML table styled for the premium dark mode.
+    The table body scrolls vertically inside a fixed-height container; header stays pinned.
+    """
     pill_cols = pill_cols or {}
     d = df.copy()
     if max_rows:
@@ -404,42 +386,52 @@ def render_html_table(df: pd.DataFrame, pill_cols=None, max_rows=None):
         rows_html += f"<tr>{''.join(cells)}</tr>"
 
     table_html = f"""
-<style>
-.classic-table {{
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.86rem;
-    color: #cbd5e1;
-}}
-.classic-table th {{
-    text-align: left;
-    background: #121526;
-    color: #94a3b8;
-    font-weight: 700;
-    font-size: 0.74rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    padding: 0.75rem 0.85rem;
-    border-bottom: 2px solid #1e2443;
-    position: sticky;
-    top: 0;;
-}}
-.classic-table td {{
-    padding: 0.7rem 0.85rem;
-    border-bottom: 1px solid #1e2443;
-    color: #cbd5e1;
-}}
-.classic-table tr:hover td {{
-    background: #181d36;
-}}
-</style>
-<table class="classic-table">
-<thead><tr>{headers}</tr></thead>
-<tbody>{rows_html}</tbody>
-</table>
-"""
+    <style>
+    .table-scroll-wrapper {{
+        height: {height}px;
+        overflow-y: auto;
+        overflow-x: auto;
+        border-radius: 8px;
+        border: 1px solid #1e2443;
+    }}
+    .classic-table {{
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.86rem;
+        color: #cbd5e1;
+    }}
+    .classic-table th {{
+        text-align: left;
+        background: #121526;
+        color: #94a3b8;
+        font-weight: 700;
+        font-size: 0.74rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 0.75rem 0.85rem;
+        border-bottom: 2px solid #1e2443;
+        position: sticky;
+        top: 0;
+        z-index: 1;
+    }}
+    .classic-table td {{
+        padding: 0.7rem 0.85rem;
+        border-bottom: 1px solid #1e2443;
+        color: #cbd5e1;
+        white-space: nowrap;
+    }}
+    .classic-table tr:hover td {{
+        background: #181d36;
+    }}
+    </style>
+    <div class="table-scroll-wrapper">
+    <table class="classic-table">
+    <thead><tr>{headers}</tr></thead>
+    <tbody>{rows_html}</tbody>
+    </table>
+    </div>
+    """
     st.markdown(table_html, unsafe_allow_html=True)
-
 
 PLOTLY_TEMPLATE = "plotly_dark"
 NAVY = "#5e5ce6"
@@ -453,14 +445,10 @@ LOW = "#10b981"
 SEVERITY_ORDER = ["Critical", "High", "Medium", "Low"]
 TIER_ORDER = ["Tier0", "Tier1", "Tier2"]
 
-
-
-
-
 def inject_table_css():
     st.markdown("""
     <style>
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(div.dt-marker) {
+    div[data-testid="stElementContainer"]:has(div.dt-marker) > div {
         border: 1px solid #1e2443 !important;
         border-radius: 14px !important;
         background-color: #0d1230 !important;
@@ -496,7 +484,6 @@ def inject_table_css():
         border-color: #3b82f6;
         color: #3b82f6;
     }
-    /* the collapse caret button — smaller, neutral */
     .dt-caret button {
         background-color: transparent !important;
         border: none !important;
@@ -510,11 +497,9 @@ def inject_table_css():
     </style>
     """, unsafe_allow_html=True)
 
-
 def _styled_span(text, color="#cbd5e1", weight="500", size=None):
     size_css = f"font-size:{size};" if size else ""
     return f"<span style='color:{color}; font-weight:{weight}; {size_css}'>{text}</span>"
-
 
 def _render_cell(row, col_def):
     key = col_def["key"]
@@ -546,17 +531,8 @@ def _render_cell(row, col_def):
 
     return _styled_span(value)
 
-
-def render_data_table(df, columns, actions=None, key_prefix="dt", expandable=False, detail_fn=None):
-    """
-    Generic rounded-frame interactive table with optional expand/collapse rows.
-
-    New args:
-        expandable: if True, adds a caret column at the start of each row.
-            Clicking toggles a detail panel below that row.
-        detail_fn: fn(row) -> str (HTML) rendering the expanded content.
-            Required if expandable=True.
-    """
+def render_data_table(df, columns, actions=None, key_prefix="dt", expandable=False, detail_fn=None, height=350):
+    
     actions = actions or []
     caret_width = [0.4] if expandable else []
     col_widths = caret_width + [c["width"] for c in columns] + [a["width"] for a in actions]
@@ -564,9 +540,8 @@ def render_data_table(df, columns, actions=None, key_prefix="dt", expandable=Fal
     if expandable and "_dt_expanded" not in st.session_state:
         st.session_state["_dt_expanded"] = set()
 
-    with st.container(border=True):
+    with st.container(border=True, height=height):
         st.markdown('<div class="dt-marker"></div>', unsafe_allow_html=True)
-
         # header
         header_cols = st.columns(col_widths)
         offset = 1 if expandable else 0
@@ -581,7 +556,6 @@ def render_data_table(df, columns, actions=None, key_prefix="dt", expandable=Fal
         for idx, row in df.iterrows():
             st.markdown('<div class="dt-row">', unsafe_allow_html=True)
             cols = st.columns(col_widths)
-
             row_id = f"{key_prefix}_{idx}"
             if expandable:
                 is_open = row_id in st.session_state["_dt_expanded"]
@@ -601,11 +575,16 @@ def render_data_table(df, columns, actions=None, key_prefix="dt", expandable=Fal
 
             for c, action in zip(cols[offset + len(columns):], actions):
                 btn_key = f"{key_prefix}_{action['key_suffix']}_{idx}"
-                if c.button(action["label"], key=btn_key):
-                    action["on_click"](row)
-
+                label_text = action["label"](row) if callable(action["label"]) else action["label"]
+                
+         
+                c.button(
+                    label=label_text, 
+                    key=btn_key,
+                    on_click=action["on_click"], 
+                    args=(row,) 
+                )
             st.markdown('</div>', unsafe_allow_html=True)
 
-            # detail panel, shown if this row is expanded
             if expandable and row_id in st.session_state["_dt_expanded"]:
                 st.markdown(f'<div class="dt-detail">{detail_fn(row)}</div>', unsafe_allow_html=True)
