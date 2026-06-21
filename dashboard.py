@@ -40,6 +40,26 @@ risk_df = calculate_risk_score(damage, dormancy)
 
 no_of_incidents = len(incidents_raw)
 incidents = incidents_raw.rename(columns={"incident_type": "rule_type"}).copy()
+
+# Normalize platform column name to handle potential "On Platform" or casing differences
+for col in incidents.columns:
+    if col.lower() in ["platform", "on platform"]:
+        incidents.rename(columns={col: "platform"}, inplace=True)
+
+# Reconstruct or default platform if it's missing entirely to avoid KeyError
+if "platform" not in incidents.columns:
+    def detect_platform(desc):
+        if not isinstance(desc, str):
+            return ""
+        for p in ["AWS", "Okta", "AD"]:
+            if p in desc:
+                return p
+        return ""
+    if "description" in incidents.columns:
+        incidents["platform"] = incidents["description"].apply(detect_platform)
+    else:
+        incidents["platform"] = ""
+
 incidents["severity"] = incidents["severity"].str.title()
 
 
@@ -185,7 +205,6 @@ elif page == "Damage":
         conn.commit()
         conn.close()
         st.toast(f"Status disabled for identity: {row['identity_name']} (ID: {row['identity_id']})")
-        st.rerun()
 
     if top_damage.empty:
         st.markdown("<p style='color:#94a3b8; font-family: Inter, sans-serif; padding: 1rem;'>✅ No high-risk accounts found in the registry.</p>", unsafe_allow_html=True)
@@ -254,7 +273,6 @@ elif page == "Remediation":
         conn.close()
 
         st.toast(f"User status disabled {row['rule_type']} for ID: {row['identity_id']} in {row['platform']}.")
-        st.rerun()
 
 
     def rotate_tockens(row):
@@ -269,7 +287,6 @@ elif page == "Remediation":
         conn.commit()
         conn.close()
         st.toast(f"Token rotated for user: {row['identity_id']}")
-        st.rerun()
 
     def revoke_tier(row):
         conn = connect_db()
@@ -288,7 +305,6 @@ elif page == "Remediation":
         conn.commit()
         conn.close()
         st.toast(f"Revoked all the tier :{row['elevated_tier']} for user: {row['identity_id']}")
-        st.rerun()
 
     
 
@@ -537,7 +553,6 @@ else:
         conn.commit()
         conn.close()
         st.toast(f"Status disabled for identity: {row['identity_name']} (ID: {row['identity_id']})")
-        st.rerun()
 
     inject_table_css()
     def risk_detail_html(row):

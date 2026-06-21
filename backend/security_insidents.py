@@ -5,6 +5,19 @@ import pandas as pd
 def generate_security_incidents():
     conn = connect_db()
     cursor = conn.cursor()
+
+    # Ensure platform and elevated_tier columns exist in security_incidents table
+    try:
+        cursor.execute("PRAGMA table_info(security_incidents);")
+        existing_columns = [col[1] for col in cursor.fetchall()]
+        if "platform" not in existing_columns:
+            cursor.execute("ALTER TABLE security_incidents ADD COLUMN platform TEXT;")
+        if "elevated_tier" not in existing_columns:
+            cursor.execute("ALTER TABLE security_incidents ADD COLUMN elevated_tier TEXT;")
+        conn.commit()
+    except Exception as e:
+        print(f"Error ensuring security_incidents columns: {e}")
+
     cursor.execute("DELETE FROM security_incidents;")
 
     ghost_account_insert = """

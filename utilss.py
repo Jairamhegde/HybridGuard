@@ -357,12 +357,19 @@ def kpi_row(cards_html: list):
     st.markdown(f'<div class="kpi-row">{"".join(cards_html)}</div>', unsafe_allow_html=True)
 
 def severity_pill(sev: str) -> str:
-    color = SEVERITY_COLORS.get(sev, "#4a5568")
-    return f'<span class="pill" style="background:{color}">{sev.upper()}</span>'
+    if not sev or pd.isna(sev):
+        return f'<span class="pill" style="background:#4a5568">—</span>'
+    sev_str = str(sev).upper()
+    color = SEVERITY_COLORS.get(sev_str.title(), "#4a5568")
+    return f'<span class="pill" style="background:{color}">{sev_str}</span>'
 
 def tier_pill(tier: str) -> str:
-    color = TIER_COLORS.get(tier, "#4a5568")
-    return f'<span class="pill" style="background:{color}">{tier}</span>'
+    if not tier or pd.isna(tier):
+        return f'<span class="pill" style="background:#4a5568">—</span>'
+    tier_str = str(tier)
+    key = tier_str.replace(" ", "")
+    color = TIER_COLORS.get(key, "#4a5568")
+    return f'<span class="pill" style="background:{color}">{tier_str}</span>'
 
 
 def render_html_table(df: pd.DataFrame, pill_cols=None, max_rows=None, height: int = 400):
@@ -510,13 +517,20 @@ def _render_cell(row, col_def):
         color = col_def.get("color", "#cbd5e1")
         weight = col_def.get("weight", "500")
         prefix = col_def.get("prefix", "")
-        return f"{prefix}{_styled_span(value, color=color, weight=weight)}"
+        display_val = "—" if (pd.isna(value) or value is None or value == "") else str(value)
+        return f"{prefix}{_styled_span(display_val, color=color, weight=weight)}"
 
     if cell_type == "score":
         thresholds = col_def.get("thresholds", {})
-        if value >= thresholds.get("high", 70):
+        if pd.isna(value) or value is None:
+            return _styled_span("—", color="#94a3b8", weight="500")
+        try:
+            val_num = float(value)
+        except (ValueError, TypeError):
+            val_num = 0.0
+        if val_num >= thresholds.get("high", 70):
             color = "#ef4444"
-        elif value >= thresholds.get("medium", 40):
+        elif val_num >= thresholds.get("medium", 40):
             color = "#f59e0b"
         else:
             color = "#22c55e"
@@ -540,7 +554,12 @@ def render_data_table(df, columns, actions=None, key_prefix="dt", expandable=Fal
     if expandable and "_dt_expanded" not in st.session_state:
         st.session_state["_dt_expanded"] = set()
 
-    with st.container(border=True, height=height):
+    try:
+        container = st.container(border=True, height=height)
+    except TypeError:
+        container = st.container()
+    
+    with container:
         st.markdown('<div class="dt-marker"></div>', unsafe_allow_html=True)
         # header
         header_cols = st.columns(col_widths)
