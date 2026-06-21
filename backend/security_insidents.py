@@ -75,7 +75,8 @@ def generate_security_incidents():
     JOIN human_identities h ON a.identity_id = h.identity_id
     JOIN platforms p ON a.platform_id = p.platform_id
     WHERE a.account_status = 'ACTIVE' 
-    AND (a.token_rotated_date IS NULL OR a.token_rotated_date = '');
+    AND (a.token_rotated_date IS NULL OR a.token_rotated_date = '')
+    AND p.platform_name != 'AD';
     """
 
     privilege_creep_select = """
@@ -136,7 +137,8 @@ def generate_security_incidents():
     JOIN human_identities h ON a.identity_id = h.identity_id
     JOIN platforms p ON a.platform_id = p.platform_id
     WHERE a.account_status = 'ACTIVE' 
-    AND (a.token_rotated_date IS NULL OR a.token_rotated_date = '');
+    AND (a.token_rotated_date IS NULL OR a.token_rotated_date = '')
+    AND p.platform_name != 'AD';
     """
 
     cursor.execute(ghost_account_insert)
@@ -150,7 +152,7 @@ def generate_security_incidents():
     stale_token = pd.read_sql_query(stale_token_select, conn)
     incidents_df = pd.concat([prevelage_df, ghost_acc, stale_token], ignore_index=True)
     incidents_df = pd.read_sql_query(
-        "SELECT identity_id,incident_type, severity,platform, description FROM security_incidents ORDER BY severity ASC", conn
+        "SELECT identity_id, incident_type, severity, platform, description, elevated_tier FROM security_incidents ORDER BY severity ASC", conn
     )
 
     conn.close()

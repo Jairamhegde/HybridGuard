@@ -32,11 +32,21 @@ except AttributeError:
     except Exception:
         page = "Home"
 
-# ── Data Loading ──────────────────────────────────────────────────────────
-incidents_raw, prevelage_df, ghost_acc, stale_token = generate_security_incidents()
-damage = damage_score()
-dormancy = dormancy_threat()
-risk_df = calculate_risk_score(damage, dormancy)
+# ── Cached Data Loading (single merged function avoids DataFrame hashing issues) ──
+@st.cache_data
+def load_all_data():
+    _inc_raw, _prev_df, _ghost, _stale = generate_security_incidents()
+    _damage = damage_score()
+    _dormancy = dormancy_threat()
+    _risk = calculate_risk_score(_damage, _dormancy)
+    return _inc_raw, _prev_df, _ghost, _stale, _damage, _dormancy, _risk
+
+# Handle pending cache refresh triggered by action callbacks
+if st.session_state.get("_needs_refresh", False):
+    st.session_state["_needs_refresh"] = False
+    load_all_data.clear()
+
+incidents_raw, prevelage_df, ghost_acc, stale_token, damage, dormancy, risk_df = load_all_data()
 
 no_of_incidents = len(incidents_raw)
 incidents = incidents_raw.rename(columns={"incident_type": "rule_type"}).copy()
@@ -204,6 +214,7 @@ elif page == "Damage":
         """, (int(row['identity_id']),))
         conn.commit()
         conn.close()
+        st.session_state["_needs_refresh"] = True
         st.toast(f"Status disabled for identity: {row['identity_name']} (ID: {row['identity_id']})")
 
     if top_damage.empty:
@@ -271,7 +282,7 @@ elif page == "Remediation":
         """, (row['rule_type'], row['platform'], row['identity_id']))
         conn.commit()
         conn.close()
-
+        st.session_state["_needs_refresh"] = True
         st.toast(f"User status disabled {row['rule_type']} for ID: {row['identity_id']} in {row['platform']}.")
 
 
@@ -286,6 +297,7 @@ elif page == "Remediation":
         cur.execute(query,(row['identity_id'], row['platform']))
         conn.commit()
         conn.close()
+        st.session_state["_needs_refresh"] = True
         st.toast(f"Token rotated for user: {row['identity_id']}")
 
     def revoke_tier(row):
@@ -304,6 +316,7 @@ elif page == "Remediation":
         cur.execute(query,(row["identity_id"], row["platform"], row["elevated_tier"]))
         conn.commit()
         conn.close()
+        st.session_state["_needs_refresh"] = True
         st.toast(f"Revoked all the tier :{row['elevated_tier']} for user: {row['identity_id']}")
 
     
@@ -361,7 +374,7 @@ elif page == "Remediation":
                 {"label": "Platform",          "width": 1.0, "key": "platform",    "type": "text", "color": "#94a3b8"},
             ],
             actions=[
-                {"label": lambda row: button_name.get(row['severity'].upper(), "Remove"), "key_suffix": "remove", "width": 1.0, "on_click": revoke_acces},
+                {"label": lambda row: button_name.get(row['severity'].upper(), "Remove"), "key_suffix": "remove", "width": 1.0, "on_click": handle_remediation},
             ],
             key_prefix="violations_okta",
         )
@@ -377,7 +390,7 @@ elif page == "Remediation":
                 {"label": "Platform",          "width": 1.0, "key": "platform",    "type": "text", "color": "#94a3b8"},
             ],
             actions=[
-                {"label":lambda row: button_name.get(row['severity'].upper(), "Remove"), "key_suffix": "remove", "width": 1.0, "on_click": revoke_acces},
+                {"label":lambda row: button_name.get(row['severity'].upper(), "Remove"), "key_suffix": "remove", "width": 1.0, "on_click": handle_remediation},
             ],
             key_prefix="violations_ad",
         )
@@ -439,7 +452,7 @@ else:
             
         report = []
         report.append(f"IDENTITY RISK SUMMARY — {today}")
-        report.append("" * 36)
+        report.append("-" * 36)
         report.append(f"Total Identities Assessed: {total_identities}")
         report.append(f"High-Risk Identities: {high_risk_count} ({high_risk_pct:.1f}%)")
         report.append(f"Orphaned/Ghost Accounts: {len(ghost_acc_df)}")
@@ -552,7 +565,8 @@ else:
         """, (int(row['identity_id']),))
         conn.commit()
         conn.close()
-        st.toast(f"Status disabled for identity: {row['identity_name']} (ID: {row['identity_id']})")
+        st.session_state["_needs_refresh"] = True
+        st.toast(f"Status disabled for identity: {row['identity_name']} (ID: {row['identity_id']})")  
 
     inject_table_css()
     def risk_detail_html(row):

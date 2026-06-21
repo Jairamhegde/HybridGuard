@@ -307,6 +307,23 @@ def inject_base_css():
             font-size: 0.72rem !important;
             font-weight: 600 !important;
         }
+
+        /* ---------- Action button styling ---------- */
+        .stButton > button {
+            background-color: #151b3b;
+            color: #cbd5e1;
+            border: 1px solid #2a3158;
+            border-radius: 8px;
+            font-size: 0.80rem;
+            font-family: 'Inter', sans-serif;
+            padding: 0.25rem 0.8rem;
+            transition: all 0.2s ease;
+        }
+        .stButton > button:hover {
+            border-color: #ef4444;
+            color: #ef4444;
+            background-color: rgba(239,68,68,0.08);
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -453,53 +470,23 @@ SEVERITY_ORDER = ["Critical", "High", "Medium", "Low"]
 TIER_ORDER = ["Tier0", "Tier1", "Tier2"]
 
 def inject_table_css():
+    """Injects button styling for the data table action buttons."""
     st.markdown("""
     <style>
-    div[data-testid="stElementContainer"]:has(div.dt-marker) > div {
-        border: 1px solid #1e2443 !important;
-        border-radius: 14px !important;
-        background-color: #0d1230 !important;
-        padding: 0.5rem 0.75rem !important;
-    }
-    .dt-row {
-        border-bottom: 1px solid #1e2443;
-        padding: 0.6rem 0;
-    }
-    .dt-row:last-child {
-        border-bottom: none;
-    }
-    .dt-detail {
-        border-bottom: 1px solid #1e2443;
-        background-color: #090d22;
-        border-radius: 8px;
-        padding: 0.75rem 1rem;
-        margin: 0.3rem 0 0.6rem 0;
-    }
-    .dt-marker ~ div .stButton button {
+    /* Action button styling for data tables */
+    div[data-testid="stHorizontalBlock"] .stButton > button {
         background-color: #151b3b;
         color: #cbd5e1;
         border: 1px solid #2a3158;
         border-radius: 8px;
-        font-size: 0.82rem;
+        font-size: 0.80rem;
         padding: 0.25rem 0.8rem;
+        width: 100%;
     }
-    .dt-marker ~ div .stButton button:hover {
+    div[data-testid="stHorizontalBlock"] .stButton > button:hover {
         border-color: #ef4444;
         color: #ef4444;
-    }
-    .dt-marker ~ div .stButton.dt-secondary button:hover {
-        border-color: #3b82f6;
-        color: #3b82f6;
-    }
-    .dt-caret button {
-        background-color: transparent !important;
-        border: none !important;
-        color: #94a3b8 !important;
-        padding: 0 !important;
-        font-size: 0.95rem !important;
-    }
-    .dt-caret button:hover {
-        color: #ffffff !important;
+        background-color: rgba(239,68,68,0.08);
     }
     </style>
     """, unsafe_allow_html=True)
@@ -545,65 +532,114 @@ def _render_cell(row, col_def):
 
     return _styled_span(value)
 
+
 def render_data_table(df, columns, actions=None, key_prefix="dt", expandable=False, detail_fn=None, height=350):
-    
+    """Renders a styled data table with pagination and optional action buttons.
+
+    Architecture (fixes infinite rerender loop):
+    - Data cells → single HTML string per row  (eliminates per-cell st.columns / st.markdown calls)
+    - Action buttons → native st.button        (required for on_click callbacks)
+    - Container → st.container(border=True) WITHOUT height  (eliminates scroll-JS rerender trigger)
+    """
     actions = actions or []
-    caret_width = [0.4] if expandable else []
-    col_widths = caret_width + [c["width"] for c in columns] + [a["width"] for a in actions]
 
-    if expandable and "_dt_expanded" not in st.session_state:
-        st.session_state["_dt_expanded"] = set()
+    if df.empty:
+        st.markdown(
+            "<p style='color:#94a3b8;font-family:Inter,sans-serif;padding:0.5rem 0;'>"
+            "No records found.</p>",
+            unsafe_allow_html=True,
+        )
+        return
 
+    # ── Pagination ─────────────────────────────────────────────────────────
+    limit = 10
+    total_rows = len(df)
+    if total_rows > limit:
+        num_pages = (total_rows - 1) // limit + 1
+        pc1, pc2 = st.columns([4, 1])
+        with pc2:
+            page_num = st.selectbox(
+                "Page",
+                options=list(range(1, num_pages + 1)),
+                key=f"_pg_{key_prefix}",
+                label_visibility="collapsed",
+            )
+        with pc1:
+            s = (page_num - 1) * limit + 1
+            e = min(total_rows, page_num * limit)
+            st.markdown(
+                f"<p style='color:#94a3b8;font-size:0.82rem;margin:6px 0;"
+                f"font-family:Inter,sans-serif;'>Showing "
+                f"<b style='color:#cbd5e1'>{s}–{e}</b> of "
+                f"<b style='color:#cbd5e1'>{total_rows}</b>"
+                f"&nbsp;·&nbsp;Page {page_num}/{num_pages}</p>",
+                unsafe_allow_html=True,
+            )
+        df_page = df.iloc[(page_num - 1) * limit : page_num * limit]
+    else:
+        df_page = df
+
+    # ── Column proportional widths ──────────────────────────────────────────
+    total_data_w = sum(c["width"] for c in columns)
+    fracs = [c["width"] / total_data_w for c in columns]
+
+    has_actions = bool(actions)
+    if has_actions:
+        layout_widths = [total_data_w] + [a["width"] for a in actions]
+
+    # ── Table container – border only, NO height (eliminates scroll-JS loop) ─
     try:
-        container = st.container(border=True, height=height)
+        outer = st.container(border=True)
     except TypeError:
-        container = st.container()
-    
-    with container:
-        st.markdown('<div class="dt-marker"></div>', unsafe_allow_html=True)
-        # header
-        header_cols = st.columns(col_widths)
-        offset = 1 if expandable else 0
-        if expandable:
-            header_cols[0].markdown("", unsafe_allow_html=True)
-        for c, col_def in zip(header_cols[offset:], columns):
-            c.markdown(_styled_span(col_def["label"].upper(), color="#94a3b8", weight="600", size="0.78rem"), unsafe_allow_html=True)
-        for c, action in zip(header_cols[offset + len(columns):], actions):
-            c.markdown("", unsafe_allow_html=True)
+        outer = st.container()
 
-        # rows
-        for idx, row in df.iterrows():
-            st.markdown('<div class="dt-row">', unsafe_allow_html=True)
-            cols = st.columns(col_widths)
-            row_id = f"{key_prefix}_{idx}"
-            if expandable:
-                is_open = row_id in st.session_state["_dt_expanded"]
-                caret = "▾" if is_open else "▸"
-                with cols[0]:
-                    st.markdown('<div class="dt-caret">', unsafe_allow_html=True)
-                    if st.button(caret, key=f"caret_{row_id}"):
-                        if is_open:
-                            st.session_state["_dt_expanded"].discard(row_id)
-                        else:
-                            st.session_state["_dt_expanded"].add(row_id)
-                        st.rerun()
-                    st.markdown('</div>', unsafe_allow_html=True)
-
-            for c, col_def in zip(cols[offset:offset + len(columns)], columns):
-                c.markdown(_render_cell(row, col_def), unsafe_allow_html=True)
-
-            for c, action in zip(cols[offset + len(columns):], actions):
-                btn_key = f"{key_prefix}_{action['key_suffix']}_{idx}"
-                label_text = action["label"](row) if callable(action["label"]) else action["label"]
-                
-         
-                c.button(
-                    label=label_text, 
-                    key=btn_key,
-                    on_click=action["on_click"], 
-                    args=(row,) 
+    with outer:
+        # ── Header (1 HTML call, zero layout widgets) ────────────────────────
+        header_cells = "".join(
+            f'<span style="flex:{frac:.4f};min-width:0;padding:6px 10px;'
+            f'color:#94a3b8;font-size:0.74rem;font-weight:700;text-transform:uppercase;'
+            f'letter-spacing:0.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
+            f'{c["label"]}</span>'
+            for c, frac in zip(columns, fracs)
+        )
+        header_html = f'<div style="display:flex;border-bottom:2px solid #1e2443;padding:2px 0;background:transparent;">{header_cells}</div>'
+        if has_actions:
+            h_cols = st.columns(layout_widths)
+            h_cols[0].markdown(header_html, unsafe_allow_html=True)
+            for h_col in h_cols[1:]:
+                h_col.markdown(
+                    f'<div style="border-bottom:2px solid #1e2443;height:28px;"></div>',
+                    unsafe_allow_html=True,
                 )
-            st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            st.markdown(header_html, unsafe_allow_html=True)
 
-            if expandable and row_id in st.session_state["_dt_expanded"]:
-                st.markdown(f'<div class="dt-detail">{detail_fn(row)}</div>', unsafe_allow_html=True)
+        # ── Data rows ────────────────────────────────────────────────────────
+        for idx, row in df_page.iterrows():
+            # All data cells → one HTML string (NO per-cell Streamlit widget calls)
+            cells_html = "".join(
+                f'<span style="flex:{frac:.4f};min-width:0;padding:8px 10px;'
+                f'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'
+                f'{_render_cell(row, c)}</span>'
+                for c, frac in zip(columns, fracs)
+            )
+            row_div = (
+                f'<div style="display:flex;align-items:center;'
+                f'min-height:42px;border-bottom:1px solid #1e2443;">'
+                f'{cells_html}</div>'
+            )
+
+            if has_actions:
+                # 1 st.columns call per row: [HTML data block | action button(s)]
+                cols = st.columns(layout_widths)
+                cols[0].markdown(row_div, unsafe_allow_html=True)
+                for action, col in zip(actions, cols[1:]):
+                    lbl = action["label"](row) if callable(action["label"]) else action["label"]
+                    col.button(
+                        lbl,
+                        key=f"{key_prefix}_{action['key_suffix']}_{idx}",
+                        on_click=action["on_click"],
+                        args=(row,),
+                    )
+            else:
+                st.markdown(row_div, unsafe_allow_html=True)
