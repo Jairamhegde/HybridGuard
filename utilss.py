@@ -28,7 +28,7 @@ TIER_COLORS = {
 }
 
 
-@st.cache_data(ttl=300)
+
 def load_table(name: str) -> pd.DataFrame:
     conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql(f"SELECT * FROM {name}", conn)
@@ -36,7 +36,7 @@ def load_table(name: str) -> pd.DataFrame:
     return df
 
 
-@st.cache_data(ttl=300)
+
 def load_all():
     return {
         "dormancy": load_table("dormancy"),
@@ -421,6 +421,8 @@ def render_html_table(df: pd.DataFrame, pill_cols=None, max_rows=None):
     letter-spacing: 0.04em;
     padding: 0.75rem 0.85rem;
     border-bottom: 2px solid #1e2443;
+    position: sticky;
+    top: 0;;
 }}
 .classic-table td {{
     padding: 0.7rem 0.85rem;
@@ -450,3 +452,160 @@ LOW = "#10b981"
 
 SEVERITY_ORDER = ["Critical", "High", "Medium", "Low"]
 TIER_ORDER = ["Tier0", "Tier1", "Tier2"]
+
+
+
+
+
+def inject_table_css():
+    st.markdown("""
+    <style>
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(div.dt-marker) {
+        border: 1px solid #1e2443 !important;
+        border-radius: 14px !important;
+        background-color: #0d1230 !important;
+        padding: 0.5rem 0.75rem !important;
+    }
+    .dt-row {
+        border-bottom: 1px solid #1e2443;
+        padding: 0.6rem 0;
+    }
+    .dt-row:last-child {
+        border-bottom: none;
+    }
+    .dt-detail {
+        border-bottom: 1px solid #1e2443;
+        background-color: #090d22;
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        margin: 0.3rem 0 0.6rem 0;
+    }
+    .dt-marker ~ div .stButton button {
+        background-color: #151b3b;
+        color: #cbd5e1;
+        border: 1px solid #2a3158;
+        border-radius: 8px;
+        font-size: 0.82rem;
+        padding: 0.25rem 0.8rem;
+    }
+    .dt-marker ~ div .stButton button:hover {
+        border-color: #ef4444;
+        color: #ef4444;
+    }
+    .dt-marker ~ div .stButton.dt-secondary button:hover {
+        border-color: #3b82f6;
+        color: #3b82f6;
+    }
+    /* the collapse caret button — smaller, neutral */
+    .dt-caret button {
+        background-color: transparent !important;
+        border: none !important;
+        color: #94a3b8 !important;
+        padding: 0 !important;
+        font-size: 0.95rem !important;
+    }
+    .dt-caret button:hover {
+        color: #ffffff !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+
+def _styled_span(text, color="#cbd5e1", weight="500", size=None):
+    size_css = f"font-size:{size};" if size else ""
+    return f"<span style='color:{color}; font-weight:{weight}; {size_css}'>{text}</span>"
+
+
+def _render_cell(row, col_def):
+    key = col_def["key"]
+    value = row[key]
+    cell_type = col_def.get("type", "text")
+
+    if cell_type == "text":
+        color = col_def.get("color", "#cbd5e1")
+        weight = col_def.get("weight", "500")
+        prefix = col_def.get("prefix", "")
+        return f"{prefix}{_styled_span(value, color=color, weight=weight)}"
+
+    if cell_type == "score":
+        thresholds = col_def.get("thresholds", {})
+        if value >= thresholds.get("high", 70):
+            color = "#ef4444"
+        elif value >= thresholds.get("medium", 40):
+            color = "#f59e0b"
+        else:
+            color = "#22c55e"
+        return _styled_span(value, color=color, weight="700")
+
+    if cell_type == "pill":
+        pill_fn = col_def["pill_fn"]
+        return pill_fn(value)
+
+    if cell_type == "custom":
+        return col_def["render_fn"](row)
+
+    return _styled_span(value)
+
+
+def render_data_table(df, columns, actions=None, key_prefix="dt", expandable=False, detail_fn=None):
+    """
+    Generic rounded-frame interactive table with optional expand/collapse rows.
+
+    New args:
+        expandable: if True, adds a caret column at the start of each row.
+            Clicking toggles a detail panel below that row.
+        detail_fn: fn(row) -> str (HTML) rendering the expanded content.
+            Required if expandable=True.
+    """
+    actions = actions or []
+    caret_width = [0.4] if expandable else []
+    col_widths = caret_width + [c["width"] for c in columns] + [a["width"] for a in actions]
+
+    if expandable and "_dt_expanded" not in st.session_state:
+        st.session_state["_dt_expanded"] = set()
+
+    with st.container(border=True):
+        st.markdown('<div class="dt-marker"></div>', unsafe_allow_html=True)
+
+        # header
+        header_cols = st.columns(col_widths)
+        offset = 1 if expandable else 0
+        if expandable:
+            header_cols[0].markdown("", unsafe_allow_html=True)
+        for c, col_def in zip(header_cols[offset:], columns):
+            c.markdown(_styled_span(col_def["label"].upper(), color="#94a3b8", weight="600", size="0.78rem"), unsafe_allow_html=True)
+        for c, action in zip(header_cols[offset + len(columns):], actions):
+            c.markdown("", unsafe_allow_html=True)
+
+        # rows
+        for idx, row in df.iterrows():
+            st.markdown('<div class="dt-row">', unsafe_allow_html=True)
+            cols = st.columns(col_widths)
+
+            row_id = f"{key_prefix}_{idx}"
+            if expandable:
+                is_open = row_id in st.session_state["_dt_expanded"]
+                caret = "▾" if is_open else "▸"
+                with cols[0]:
+                    st.markdown('<div class="dt-caret">', unsafe_allow_html=True)
+                    if st.button(caret, key=f"caret_{row_id}"):
+                        if is_open:
+                            st.session_state["_dt_expanded"].discard(row_id)
+                        else:
+                            st.session_state["_dt_expanded"].add(row_id)
+                        st.rerun()
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+            for c, col_def in zip(cols[offset:offset + len(columns)], columns):
+                c.markdown(_render_cell(row, col_def), unsafe_allow_html=True)
+
+            for c, action in zip(cols[offset + len(columns):], actions):
+                btn_key = f"{key_prefix}_{action['key_suffix']}_{idx}"
+                if c.button(action["label"], key=btn_key):
+                    action["on_click"](row)
+
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            # detail panel, shown if this row is expanded
+            if expandable and row_id in st.session_state["_dt_expanded"]:
+                st.markdown(f'<div class="dt-detail">{detail_fn(row)}</div>', unsafe_allow_html=True)

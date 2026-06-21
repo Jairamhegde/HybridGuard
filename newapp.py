@@ -12,7 +12,7 @@ from utilss import (
 
 st.set_page_config(
     page_title="Identity Risk & Threat Analytics",
-    page_icon="🛡️",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -49,9 +49,13 @@ dormancy["status"] = dormancy["hr_status"]
 
 # Top row metrics computation
 total_identities = dormancy["identity_name"].nunique()
+
 critical_n = (incidents["severity"] == "Critical").sum()
+
 high_n = (incidents["severity"] == "High").sum()
+
 medium_n = (incidents["severity"] == "Medium").sum()
+
 avg_dormancy = dormancy["dormancy_score"].mean()
 avg_damage = damage["damage_score"].mean()
 high_risk_identities = damage[damage["damage_score"] >= 60]["identity_name"].nunique()
@@ -75,21 +79,21 @@ with st.sidebar:
     if st.button("↻ Refresh data cache", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
-    st.caption("Stack: Python · Pandas · SQLite · Plotly · Streamlit")
+
 
 # ── Route page content ───────────────────────────────────────────────────
 if page == "Dormancy":
     masthead("Dormancy Analysis")
     
-    # col1, col2, col3, col4 = st.columns(4)
-    # with col1:
-    #     st.metric("Avg. Dormancy Score", f"{avg_dormancy:.1f}", "higher = staler")
-    # with col2:
-    #     st.metric("Max Days Dormant", f"{dormancy['days_dormant'].max():.0f} days", "Stalest account", delta_color="inverse")
-    # with col3:
-    #     st.metric("Dormant Identities", f"{len(dormancy[dormancy['days_dormant'] >= 60])}", "Inactive 60+ days", delta_color="inverse")
-    # with col4:
-    #     st.metric("Identities Monitored", f"{total_identities}", "AD, AWS & Okta")
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Avg. Dormancy Score", f"{avg_dormancy:.1f}", "higher = staler")
+    with col2:
+        st.metric("Max Days Dormant", f"{dormancy['days_dormant'].max():.0f} days", "Stalest account", delta_color="inverse")
+    with col3:
+        st.metric("Dormant Identities", f"{len(dormancy[dormancy['days_dormant'] >= 60])}", "Inactive 60+ days", delta_color="inverse")
+    with col4:
+        st.metric("Identities Monitored", f"{total_identities}", "AD, AWS & Okta")
     
     section_head("Dormancy Distribution", "Overview of identity inactivity times across all integrated platforms")
     
@@ -248,136 +252,3 @@ else:
         st.metric("High Severity Incidents", f"{high_n}", "Review within 7 days", delta_color="inverse")
     with col4:
         st.metric("Total Open Incidents", f"{len(incidents)}", "All risk rules", delta_color="inverse")
-        
-    st.markdown("<div style='height:0.7rem'></div>", unsafe_allow_html=True)
-    
-    # Second KPI row using st.metric
-    col5, col6, col7, col8 = st.columns(4)
-    with col5:
-        st.metric("Avg. Dormancy Score", f"{avg_dormancy:.1f}", "higher = staler")
-    with col6:
-        st.metric("Avg. Damage Score", f"{avg_damage:.1f}", "blast radius")
-    with col7:
-        st.metric("High-Risk Identities", f"{high_risk_identities}", "Damage score ≥ 60", delta_color="inverse")
-    with col8:
-        st.metric("Remediation Rate", "84.2%", "Target: 95%")
-    
-    section_head("Identity Risk & Threat Analysis", "Snapshot of privilege exposure and dormant access across platforms")
-    
-    # Horizontal Bar Charts side-by-side (matching the screenshot styling)
-    # Left: Top 10 Most Exposed (Damage Score)
-    top_damage = damage.sort_values("damage_score", ascending=False).head(10).copy()
-    top_damage = top_damage.sort_values("damage_score", ascending=True) # Ascending order to sort largest at top in plot
-    
-    fig_damage = px.bar(
-        top_damage,
-        x="damage_score",
-        y="identity_name",
-        orientation="h",
-        text="damage_score",
-        color_discrete_sequence=["#5e5ce6"]
-    )
-    fig_damage.update_traces(
-        textposition="outside",
-        texttemplate="%{text}",
-        cliponaxis=False,
-        marker_color="#5e5ce6"
-    )
-    fig_damage.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font_color="#cbd5e1",
-        margin=dict(t=20, b=10, l=10, r=10),
-        xaxis=dict(showgrid=False, visible=False, range=[0, 115]),
-        yaxis=dict(showgrid=False, color="#94a3b8", title=None),
-        showlegend=False,
-        height=360
-    )
-    
-    # Right: Top 10 Most Dormant (Dormancy Score)
-    top_dormancy = dormancy.sort_values("dormancy_score", ascending=False).head(10).copy()
-    top_dormancy = top_dormancy.sort_values("dormancy_score", ascending=True)
-    
-    fig_dormancy = px.bar(
-        top_dormancy,
-        x="dormancy_score",
-        y="identity_name",
-        orientation="h",
-        text="dormancy_score",
-        color="dormancy_score",
-        color_continuous_scale=[[0, "#065f46"], [0.5, "#10b981"], [1.0, "#34d399"]]
-    )
-    fig_dormancy.update_traces(
-        textposition="outside",
-        texttemplate="%{text}",
-        cliponaxis=False
-    )
-    fig_dormancy.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font_color="#cbd5e1",
-        margin=dict(t=20, b=10, l=10, r=10),
-        xaxis=dict(showgrid=False, visible=False, range=[0, 115]),
-        yaxis=dict(showgrid=False, color="#94a3b8", title=None),
-        coloraxis_showscale=True,
-        coloraxis_colorbar=dict(
-            title="Dormancy",
-            thickness=15,
-            len=0.9,
-            yanchor="middle",
-            y=0.5,
-            ticks="outside",
-            tickfont=dict(color="#94a3b8", size=9)
-        ),
-        showlegend=False,
-        height=360
-    )
-    
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown('<div class="panel">', unsafe_allow_html=True)
-        st.markdown("**Top 10 Most Exposed Identities (Damage Score)**")
-        st.plotly_chart(fig_damage, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-    with c2:
-        st.markdown('<div class="panel">', unsafe_allow_html=True)
-        st.markdown("**Top 10 Most Dormant Identities (Dormancy Score)**")
-        st.plotly_chart(fig_dormancy, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-    # Table of Combined Risk
-    section_head("Top-Risk Identities", "Ranked by combined dormancy + damage exposure")
-    
-    combined = dormancy.merge(
-        damage[["identity_name", "total_entitlements", "unused_permissions", "platform_count", "damage_score"]],
-        on="identity_name", 
-        how="left"
-    )
-    combined["combined_score"] = (0.5 * combined["dormancy_score"] + 0.5 * combined["damage_score"]).round(1)
-    top = combined.sort_values("combined_score", ascending=False).head(10).reset_index(drop=True)
-    top.index += 1
-    
-    display_df = top[["identity_name", "department", "tier", "status",
-                       "dormancy_score", "damage_score", "combined_score"]].copy()
-    display_df.insert(0, "rank", top.index)
-    display_df.columns = ["Rank", "Identity Name", "Department", "Privilege Tier", "Status", "Dormancy Score", "Damage Score", "Combined Score"]
-    
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
-    render_html_table(
-        display_df,
-        pill_cols={"Privilege Tier": tier_pill},
-    )
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# ── Footnote ─────────────────────────────────────────────────────────────
-st.markdown(
-    """
-    <div class="footnote">
-        Scores are computed as weighted combinations of privilege breadth, dormancy duration,
-        platform spread, and behavioral deviation (z-score of entitlement breadth vs. peer population).
-        Use the sidebar navigation to toggle views for rule-level details, remediation actions, and backlog.
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
