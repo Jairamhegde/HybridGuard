@@ -392,6 +392,98 @@ elif page == "Identities":
     )
 
 else:
+    def generate_risk_report(risk_df, damage_df, dormancy_df, incidents_df, prevelage_df, ghost_acc_df, stale_token_df):
+        today = datetime.now().strftime("%Y-%m-%d")
+        total_identities = len(risk_df)
+        high_risk_count = len(risk_df[risk_df["risk_score"] >= 60])
+        high_risk_pct = (high_risk_count / total_identities) * 100 if total_identities else 0.0
+        
+        avg_risk = risk_df["risk_score"].mean()
+        avg_damage = damage_df["damage_score"].mean()
+        avg_dormancy = dormancy_df["dormancy_score"].mean()
+        
+        # Dormancy top user
+        dormant_count = len(dormancy_df[dormancy_df["days_dormant"] >= 60])
+        if not dormancy_df.empty:
+            top_dormant_row = dormancy_df.sort_values("days_dormant", ascending=False).iloc[0]
+            top_dormant_user = top_dormant_row["identity_name"]
+            top_dormant_days = top_dormant_row["days_dormant"]
+            top_dormant_priv = top_dormant_row["highiest_privilage"]
+        else:
+            top_dormant_user, top_dormant_days, top_dormant_priv = "N/A", 0, "N/A"
+            
+        # Remediation backlog top user/violation
+        total_incidents = len(incidents_df)
+        if not incidents_df.empty:
+            top_violation_row = incidents_df.iloc[0]
+            top_violation_desc = top_violation_row["description"]
+            top_violation_user = top_violation_row.get("full_name", "N/A")
+        else:
+            top_violation_desc, top_violation_user = "N/A", "N/A"
+            
+        report = []
+        report.append(f"IDENTITY RISK SUMMARY — {today}")
+        report.append("" * 36)
+        report.append(f"Total Identities Assessed: {total_identities}")
+        report.append(f"High-Risk Identities: {high_risk_count} ({high_risk_pct:.1f}%)")
+        report.append(f"Orphaned/Ghost Accounts: {len(ghost_acc_df)}")
+        report.append(f"Over-Privileged Roles: {len(prevelage_df)}")
+        report.append(f"Stale Security Tokens: {len(stale_token_df)}")
+        report.append(f"Alerts Clustered: {total_incidents} violations")
+        report.append("")
+        report.append("RISK METRICS OVERVIEW")
+        report.append("-" * 21)
+        report.append(f"Average Unified Risk Score: {avg_risk:.1f}/100")
+        report.append(f"Average Privilege Damage Score: {avg_damage:.1f}/100")
+        report.append(f"Average Inactivity Dormancy Score: {avg_dormancy:.1f}/100")
+        report.append("")
+        report.append("PLATFORM SECTION SUMMARY")
+        report.append("-" * 24)
+        report.append(f"- Dormancy: {dormant_count} identities are inactive for 60+ days. The top dormant user is {top_dormant_user} (dormant for {top_dormant_days} days, holding {top_dormant_priv}).")
+        report.append(f"- Remediation Backlog: {total_incidents} active violations found. The top platform violation belongs to {top_violation_user}: {top_violation_desc}.")
+        report.append("")
+        report.append("CRITICAL FINDINGS (TOP 3 HIGHEST RISK)")
+        report.append("-" * 38)
+        
+        top_3 = risk_df.head(3)
+        for idx, (_, row) in enumerate(top_3.iterrows(), 1):
+            name = row["identity_name"]
+            score = row["risk_score"]
+            tier = row["highest_tier_held"]
+            days = row["days_dormant"]
+            factors = row["risk_factors"]
+            hr_status = row["hr_status"]
+            
+            report.append(f"{idx}. {name} (HR Status: {hr_status})")
+            report.append(f"   Risk Score: {score:.1f}/100")
+            
+            issue_parts = []
+            if tier:
+                issue_parts.append(f"holds {tier} privileges")
+            if pd.notna(days):
+                issue_parts.append(f"inactive for {days} days")
+            if factors:
+                issue_parts.append(f"flagged factors: {factors}")
+            
+            issue_str = "; ".join(issue_parts)
+            report.append(f"   Issue: {issue_str}")
+            
+            if "ghost_account" in factors:
+                action = "Immediately disable all platform credentials and audit cross-platform access logs."
+            elif "high_privilege" in factors and "dormant_account" in factors:
+                action = "Disable/deprivilege inactive admin accounts, rotate credentials, and suspend access."
+            elif "high_privilege" in factors:
+                action = "Review role assignment justifications and enforce least privilege."
+            elif "dormant_account" in factors:
+                action = "Temporarily suspend inactive account or enforce credential rotation."
+            else:
+                action = "Audit platform login patterns and enforce key rotation policies."
+                
+            report.append(f"   Action: {action}")
+            report.append("")
+            
+        return "\n".join(report)
+
     high_damage_score_acc = len(damage[damage['damage_score'] >= 60])
     Dorminant_acc = len(dormancy[dormancy['days_dormant'] >= 60])
     masthead("Overview")
@@ -405,6 +497,28 @@ else:
         st.metric("Dorminant Identities", f"{Dorminant_acc}", "Inactive for 60 days", delta_color="inverse")
     with col4:
         st.metric("Identities Monitored", f"{total_identities}", "Active in Directory")
+
+    # Executive Report Generator Button
+    st.markdown("---")
+    r_col1, r_col2 = st.columns([1.2, 3.8])
+    with r_col1:
+        if st.button(" GENERATE RISK REPORT", key="btn_gen_report", use_container_width=True):
+            st.session_state["show_risk_report"] = True
+        if st.session_state.get("show_risk_report", False):
+            if st.button(" CLOSE REPORT", key="btn_close_report", use_container_width=True):
+                st.session_state["show_risk_report"] = False
+                st.rerun()
+                
+    if st.session_state.get("show_risk_report", False):
+        report_text = generate_risk_report(risk_df, damage, dormancy, incidents, prevelage_df, ghost_acc, stale_token)
+        st.text_area("Precise Executive Risk Summary", value=report_text, height=350)
+        st.download_button(
+            label="DOWNLOAD REPORT AS TEXTFILE",
+            data=report_text,
+            file_name=f"identity_risk_summary_{datetime.now().strftime('%Y%m%d')}.txt",
+            mime="text/plain",
+            use_container_width=True
+        )
 
     
     # masthead("Overview")
