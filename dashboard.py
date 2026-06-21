@@ -225,7 +225,7 @@ elif page == "Damage":
             df=top_damage,
             columns=[
                 {"label": "Identity ID",   "width": 1.0, "key": "identity_id", "type": "text"},
-                {"label": "Identity",      "width": 2.2, "key": "identity_name", "type": "text", "color": "#ffffff", "weight": "600", "prefix": "👤 "},
+                {"label": "Identity",      "width": 2.2, "key": "identity_name", "type": "text", "color": "#ffffff", "weight": "600", "prefix": "  "},
                 {"label": "HR Status",     "width": 1.2, "key": "hr_status", "type": "text"},
                 {"label": "Highest Tier",  "width": 1.5, "key": "highest_tier_held", "type": "pill", "pill_fn": tier_pill},
                 {"label": "Days Dormant",  "width": 1.2, "key": "days_dormant", "type": "text"},
