@@ -1,210 +1,357 @@
-HybridGuard
-Identity Security Posture Management (ISPM) for hybrid, multi-platform environments.
-HybridGuard unifies identity and access data from HR, Active Directory, AWS IAM, and Okta into a single relational model, resolves inconsistent usernames back to one canonical identity, normalises privilege across platforms, and computes a transparent, weighted risk score for every identity — surfacing ghost accounts, privilege creep, and stale credentials before they're exploited.
-> Built for **CyberCoders 2026** — a cybersecurity hackathon focused on practical tools that help detect, prevent, and respond to real-world security threats.
+# HybridGuard
+
+## Cross-Platform Identity Posture and Risk Dashboard
+
+HybridGuard is an Identity Security Posture Management (ISPM) platform that unifies identity data from HR, Active Directory, AWS IAM, and Okta. It resolves usernames across systems, normalizes privilege tiers, computes a weighted risk score, and presents the results through an interactive dashboard with downloadable reports.
+
 ---
-Table of Contents
-Why HybridGuard
-Architecture
-Core Components
-Name Matching Algorithm
-Permission Tier Normalizer
-Weighted Risk Scoring Engine
-Threat Detection Rules
-Project Structure
-Tech Stack
-Getting Started
-Dashboard Pages
-Database Schema
-Self-Evaluation
-Compliance Alignment
-Roadmap
-License
+
+# Overview
+
+Modern enterprises manage identities across multiple disconnected systems. HybridGuard provides a unified view of identities and privileges by combining data from:
+
+- HR systems
+- Active Directory
+- AWS IAM
+- Okta
+
+The platform performs identity resolution, privilege normalization, threat detection, risk scoring, and remediation through a single dashboard.
+
 ---
-Why HybridGuard
-Enterprises run identity across systems that were never built to talk to each other — HR knows who's employed, AD controls the network, AWS IAM and Okta control everything else. That gap creates real, measurable risk:
-Ghost accounts — disabled in HR, still active on a platform.
-Privilege creep — a standard employee quietly holding admin-level access.
-Stale credentials — keys and tokens that are never rotated.
-Stolen or compromised credentials remain the single largest initial-access vector in confirmed breaches (Verizon DBIR 2025), and credential-driven incidents take longer to detect than almost any other vector (IBM Cost of a Data Breach 2025) — because they don't look like an attack, they look like a valid login.
-HybridGuard closes that gap: one pipeline, one risk score, one console.
----
-Architecture
-HybridGuard follows a seven-stage pipeline — ingest, resolve, normalise, detect/score, present, remediate, report.
+
+# System Architecture
+
+HybridGuard follows a seven-stage pipeline:
+
+1. Telemetry Ingestion
+2. Fuzzy Identity Resolution
+3. 3NF Database Normalization
+4. Permission Tier Mapping
+5. Threat Detection and Risk Scoring
+6. Interactive Dashboard
+7. Report Generation
+
 ```mermaid
 flowchart TD
-    A["Input Telemetry<br/>AD.csv | AWS.csv | Okta.csv | audit_events.csv | user_details.csv"]
-    B["Name Matching Algorithm<br/>Fuzzy Username Resolver (SequenceMatcher, threshold ≥ 0.80)"]
-    C["3NF Relational Database (SQLite)<br/>+ Permission Tier Normalizer — Tier 0 / Tier 1 / Tier 2"]
-    D["Threat Detection Rules<br/>Ghost Account · Privilege Creep · Stale Token"]
-    E["Weighted Risk Scoring Engine<br/>Damage (40%) + Dormancy (30%) + Ghost Factor (30%)"]
-    F["Interactive Streamlit Console<br/>Overview · Identities · Remediation Backlog"]
-    G["Direct Remediation Actions<br/>Disable User · Revoke Access · Rotate Token"]
-    H["Report Generation<br/>Downloadable risk-evaluation report"]
+    A["Input Telemetry"]
+    B["Name Matching Algorithm"]
+    C["3NF SQLite Database"]
+    D["Threat Detection Rules"]
+    E["Risk Scoring Engine"]
+    F["Streamlit Dashboard"]
+    G["Remediation Actions"]
+    H["Report Generation"]
 
     A --> B --> C
     C --> D --> F
     C --> E --> F
     F --> G --> H
 ```
-> Diagram renders natively on GitHub. If you're viewing this elsewhere, a static export is available at `docs/architecture.png`.
+
 ---
-Core Components
-1. Name Matching Algorithm
-Platform usernames are formatted inconsistently across AD, AWS, and Okta, with no shared key (`ahill`, `a.hill`, `allison.hill1`). The resolver:
-Cleans each username — lower-cases it and strips non-alphabetic characters (`clean_username`).
-Generates eight likely naming patterns per canonical HR identity, e.g. `johnsmith`, `jsmith`, `johns` (`generate_namepattern`).
-Scores similarity against every pattern using `difflib.SequenceMatcher`.
-Accepts a match only at a similarity ratio ≥ 0.80, linking the account to its canonical `identity_id`. Anything below threshold surfaces as a potential orphan account.
-2. Permission Tier Normalizer
-Every platform names privilege differently — `AdministratorAccess` on AWS, `Domain Admins` on AD, `SuperAdmin` on Okta. `normalize_role()` maps every raw role onto one shared scale so privilege becomes directly comparable across platforms:
-Tier	Meaning	Examples
-Tier 0	Full administrative control	Domain Admins, AdministratorAccess, SuperAdmin
-Tier 1	Elevated / internal-tooling access	Server Operators, PowerUserAccess, InternalToolsAdmin
-Tier 2	Standard user access	Domain Users, ReadOnlyAccess, User
-A database view, `live_privileged_watchlist`, materialises every active Tier 0/1 account's effective privilege and dormancy duration for fast querying.
-3. Weighted Risk Scoring Engine
-Every identity gets a Unified Risk Score (0–100), combining three transparent, independently-inspectable components:
+
+# Input Data Files
+
+Five CSV files drive each analysis cycle.
+
+| File | Description |
+|--------|------------|
+| `user_details.csv` | HR master list containing user details and employment status |
+| `ad_users.csv` | Active Directory accounts and groups |
+| `aws_users.csv` | AWS IAM users and attached policies |
+| `okta_users.csv` | Okta accounts and role assignments |
+| `audit_events.csv` | Login history and privilege changes |
+
+Synthetic datasets are generated using:
+
+```bash
+python schema/simulate_data.py
 ```
-risk_score = (damage_score   × 0.40)   # highest privilege tier held
-           + (dormancy_score × 0.30)   # days since last login
-           + (ghost_factor   × 0.30)   # HR DISABLED but account ACTIVE
-```
-Component	Rule	Score
-Damage Score	Tier 0 / Tier 1 / Tier 2	100 / 50 / 10
-Dormancy Score	≥90 days / ≥60 days / ≥30 days inactive	100 / 50 / 10
-Ghost Factor	HR `DISABLED` + platform account `ACTIVE`	100
-Identities are tagged with readable risk factors — `high_privilege`, `dormant_account`, `ghost_account` — so the riskiest accounts surface to the top of the remediation backlog without manual triage.
-4. Threat Detection Rules
-Rule	Severity	Logic
-Ghost Account	Critical	HR status `DISABLED`, platform account `ACTIVE`
-Privilege Creep	High	Standard-tier HR employee holding Tier 0/1 access elsewhere
-Stale Token	Medium	Active account, no recorded key/token rotation
+
 ---
-Project Structure
+
+# Methods
+
+## 1. Name Matching Algorithm
+
+Usernames often differ across platforms:
+
+- `ahill`
+- `a.hill`
+- `allison.hill1`
+
+HybridGuard resolves these inconsistencies using:
+
+- `clean_username()`
+- `generate_namepattern()`
+- `difflib.SequenceMatcher`
+
+A match is accepted when:
+
+```python
+similarity_ratio >= 0.80
 ```
+
+Accounts that fail to meet the threshold are treated as potential orphan accounts.
+
+---
+
+## 2. Permission Tier Normalizer
+
+Different platforms represent privileges differently:
+
+| Platform | Example |
+|-----------|---------|
+| AWS IAM | AdministratorAccess |
+| Active Directory | Domain Admins |
+| Okta | SuperAdmin |
+
+HybridGuard maps all roles into a common hierarchy.
+
+| Tier | Description |
+|------|------------|
+| Tier 0 | Full administrative control |
+| Tier 1 | Elevated or internal-tool access |
+| Tier 2 | Standard user access |
+
+This enables privilege comparison across platforms.
+
+---
+
+## 3. Risk Scoring Engine
+
+Two independent signals are combined into a unified risk score.
+
+### Damage Score
+
+Based on highest privilege held.
+
+| Tier | Score |
+|------|------|
+| Tier 0 | 100 |
+| Tier 1 | 50 |
+| Tier 2 | 10 |
+
+Disabled users receive:
+
+```python
+damage_score = 0
+```
+
+### Dormancy Score
+
+Based on inactivity.
+
+| Days Since Login | Score |
+|-----------------|------|
+| ≥90 days | 100 |
+| ≥60 days | 50 |
+| ≥30 days | 10 |
+| Otherwise | 0 |
+
+### Overall Risk Score
+
+```python
+risk_score = (damage_score * 0.5) + (dormancy_score * 0.5)
+```
+
+Risk factors include:
+
+- `high_privilege`
+- `dormant_account`
+- `ghost_account`
+
+---
+
+## 4. Threat Detection Rules
+
+| Threat | Severity | Description |
+|---------|---------|------------|
+| Ghost Account | Critical | Disabled in HR but active on a platform |
+| Privilege Creep | High | Standard employee possessing elevated privileges |
+| Stale Token | Medium | No recorded credential rotation |
+
+---
+
+## 5. GUI Design and Remediation
+
+HybridGuard provides two Streamlit applications:
+
+### dashboard.py
+
+Five-page dashboard:
+
+- Overview
+- Dormancy Analysis
+- Damage Score
+- Remediation Backlog
+- Identities
+
+### newapp.py
+
+Lightweight four-page dashboard.
+
+Features include:
+
+- KPI cards
+- Histograms
+- Heatmaps
+- Bar charts
+- Sortable incident tables
+
+The Remediation Backlog page supports:
+
+- Access revocation
+- Credential rotation
+
+---
+
+## 6. Report Generation
+
+HybridGuard generates downloadable reports containing:
+
+- Overall risk score
+- Damage score
+- Dormancy score
+- Assigned risk factors
+- Open security incidents
+
+This provides transparency into why an identity was flagged.
+
+---
+
+# Key Features
+
+- Unified risk score (0–100)
+- Fuzzy username matching
+- Cross-platform identity correlation
+- Tier-based privilege normalization
+- Automated threat detection
+- Interactive Streamlit dashboard
+- One-click remediation actions
+- Downloadable risk evaluation reports
+
+---
+
+# Database Schema
+
+HybridGuard uses a 3NF SQLite schema consisting of:
+
+- `human_identities`
+- `platforms`
+- `accounts`
+- `role_definitions`
+- `account_role_mapping`
+- `audit_events`
+- `security_incidents`
+
+Database:
+
+```
+hybridguard.db
+```
+
+---
+
+# Project Structure
+
+```text
 HybridGuard/
+│
 ├── backend/
-│   ├── api.py                  # FastAPI REST endpoints
-│   ├── db_connection.py        # SQLite connection helper
-│   ├── normalize_and_match.py  # ETL: fuzzy matching + 3NF transform
-│   └── security_insidents.py   # Threat detection + risk scoring engine
+│   ├── api.py
+│   ├── db_connection.py
+│   ├── normalize_and_match.py
+│   └── security_incidents.py
+│
 ├── schema/
-│   ├── simulate_data.py        # Synthetic data generator (250 identities)
-│   ├── tables_creation.py      # Creates tables + live_privileged_watchlist view
-│   └── clear_data.py           # Clears all tables
+│   ├── simulate_data.py
+│   ├── tables_creation.py
+│   └── clear_data.py
+│
 ├── csvs/
 │   ├── user_details.csv
 │   ├── ad_users.csv
 │   ├── aws_users.csv
 │   ├── okta_users.csv
 │   └── audit_events.csv
-├── utils/
-│   └── __init__.py             # path constants
-├── utilss.py                   # CSS injection, pills, KPI cards, table renderers
-├── dashboard.py                 # Streamlit app — 5 pages
-├── newapp.py                    # Streamlit app — 4 pages (lightweight variant)
-├── main.py                      # Orchestrator: clear → normalize → detect
-├── self_evaluation.py           # Precision/Recall/F1 against ground truth
-├── check_db.py                  # Debug script
-├── hybridguard.db               # SQLite database (generated)
+│
+├── dashboard.py
+├── newapp.py
+├── main.py
+├── self_evaluation.py
+├── hybridguard.db
 └── requirements.txt
 ```
+
 ---
-Tech Stack
-Layer	Technology
-Language	Python 3.10+
-Database	SQLite3 (3NF schema + analytical view)
-Data handling	pandas, NumPy / SciPy
-Identity resolution	`difflib.SequenceMatcher`
-Dashboard	Streamlit + Plotly
-API	FastAPI (REST, CORS-enabled)
+
+# Technology Stack
+
+| Layer | Technology |
+|---------|-----------|
+| Data Simulation | Python |
+| Identity Resolution | `difflib.SequenceMatcher` |
+| Storage | SQLite (3NF schema) |
+| Risk Engine | Python weighted scoring model |
+| Dashboard | Streamlit |
+| API | FastAPI |
+| Report Generation | Python |
+
 ---
-Getting Started
-Prerequisites
+
+# Getting Started
+
+Install dependencies:
+
 ```bash
 pip install -r requirements.txt
 ```
-1. Generate synthetic data
+
+Generate synthetic data:
+
 ```bash
 python schema/simulate_data.py
 ```
-2. Create the database schema
+
+Create database tables:
+
 ```bash
 python schema/tables_creation.py
 ```
-3. Run the ETL + threat detection pipeline
+
+Run the pipeline:
+
 ```bash
 python main.py
 ```
-This clears existing data, runs the fuzzy-matching ETL, and populates `security_incidents`.
-4. Launch the dashboard
-```bash
-# Full 5-page dashboard
-streamlit run dashboard.py
 
-# Lightweight 4-page variant
-streamlit run newapp.py
+Launch the dashboard:
+
+```bash
+streamlit run dashboard.py
 ```
-5. (Optional) Launch the API
+
+Launch the API:
+
 ```bash
 uvicorn backend.api:myapp --reload
 ```
-Endpoint	Method	Description
-`/`	GET	All open security incidents
-`/damage_score`	GET	Damage score per identity
-`/dormancy_threat`	GET	Dormancy score per identity
----
-Dashboard Pages
-Page	Purpose
-Overview	KPI summary + Top 10 Risk Identities, ranked by unified risk score
-Dormancy Analysis	Inactivity distribution, dormancy heatmap by tier vs. HR status
-Damage Score	Blast-radius analysis by privilege tier
-Remediation Backlog	Filterable incident table with one-click Disable / Revoke / Rotate actions
-Identities	Full risk-ranked identity table
----
-Database Schema
-Six relational tables in third normal form, plus one analytical view:
-```
-human_identities ──┐
-platforms ─────────┼──> accounts ──> account_role_mapping ──> role_definitions
-audit_events ───────┘
 
-live_privileged_watchlist  (VIEW)
-  → every active Tier 0/1 identity, highest tier held, days dormant
+---
+
+# Repository
+
+GitHub:
+
 ```
-Table	Purpose
-`human_identities`	HR master record — name, email, employment status
-`platforms`	AD / AWS / Okta lookup
-`accounts`	One row per platform account, linked to an identity
-`role_definitions`	Raw role → normalised tier (0/1/2)
-`account_role_mapping`	Links accounts to their role(s)
-`audit_events`	Login / privilege-change history
-`security_incidents`	Detected Ghost Account / Privilege Creep / Stale Token violations
----
-Self-Evaluation
-`self_evaluation.py` validates detection accuracy against known ground truth:
-Backs up current data and database.
-Generates 50 synthetic identities with known anomaly types (Ghost, Privilege Creep, Escalation, Token Abuse, Normal).
-Re-runs the full pipeline.
-Compares flagged identities against ground truth → Precision, Recall, F1, plus a per-anomaly-type breakdown.
-Restores original data.
-```bash
-python self_evaluation.py
+https://github.com/Jairamhegde/HybridGuard
 ```
+
+Live Demo:
+
+```
+https://hybridguard-console.streamlit.app/
+```
+
 ---
-Compliance Alignment
-NIST SP 800-53 (AC-2, AC-6) — continuous account lifecycle monitoring, least-privilege enforcement.
-GDPR (Article 5, 32) — data minimisation via detection of access disproportionate to HR role.
-CIS Controls 5 & 6 — standardised account and access auditing across the hybrid estate.
----
-Roadmap
-[ ] Live connectors for production AD / AWS IAM / Okta tenants (replace synthetic CSVs)
-[ ] Slack / email alerting on new Critical incidents
-[ ] Role-based access control for the console itself
-[ ] Additional identity providers (Azure AD, Google Workspace)
----
-License
-This project is released under the MIT License — update this section with your team's chosen license before publishing.
----
-Built for CyberCoders 2026 — a hackathon dedicated to practical, real-world cybersecurity tooling.
