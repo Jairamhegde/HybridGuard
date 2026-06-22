@@ -248,7 +248,7 @@ hybridguard.db
 HybridGuard/
 │
 ├── backend/
-│   ├── api.py
+│   ├
 │   ├── db_connection.py
 │   ├── normalize_and_match.py
 │   └── security_incidents.py
@@ -266,9 +266,9 @@ HybridGuard/
 │   └── audit_events.csv
 │
 ├── dashboard.py
-├── newapp.py
+├
 ├── main.py
-├── self_evaluation.py
+├
 ├── hybridguard.db
 └── requirements.txt
 ```
@@ -321,11 +321,6 @@ Launch the dashboard:
 streamlit run dashboard.py
 ```
 
-Launch the API:
-
-```bash
-uvicorn backend.api:myapp --reload
-```
 
 ---
 
