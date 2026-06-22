@@ -187,17 +187,6 @@ Five-page dashboard:
 - Remediation Backlog
 - Identities
 
-### newapp.py
-
-Lightweight four-page dashboard.
-
-Features include:
-
-- KPI cards
-- Histograms
-- Heatmaps
-- Bar charts
-- Sortable incident tables
 
 The Remediation Backlog page supports:
 
