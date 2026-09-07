@@ -7,7 +7,12 @@ a shared Plotly template.
 """
 
 import pandas as pd
-import streamlit as st
+try:
+    import streamlit as st
+except ImportError:
+    st = None
+
+
 
 # ── Colour constants ──────────────────────────────────────────────────────
 NAVY = "#16223a"

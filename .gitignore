@@ -1,7 +1,11 @@
+node_modules/
+__pycache__/
+*.pyc
+*.log
+priviguard-dashboard/node_modules/
+priviguard-dashboard/dist/
 reposr.csv
 check_db.py
-*.md
-
 self_evaluation.py
 newapp.py
-docs
+docs/

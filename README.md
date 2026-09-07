@@ -283,43 +283,57 @@ HybridGuard/
 | Identity Resolution | `difflib.SequenceMatcher` |
 | Storage | SQLite (3NF schema) |
 | Risk Engine | Python weighted scoring model |
-| Dashboard | Streamlit |
-| API | FastAPI |
+| Backend API | FastAPI + Uvicorn |
+| Dashboard Frontend | React 19 + Vite + Recharts + Lucide Icons |
 | Report Generation | Python |
 
 ---
 
 # Getting Started
 
-Install dependencies:
+Install backend & root dependencies:
 
 ```bash
 pip install -r requirements.txt
+npm install
 ```
 
-Generate synthetic data:
+Generate synthetic data & run normalization pipeline:
 
 ```bash
 python schema/simulate_data.py
-```
-
-Create database tables:
-
-```bash
 python schema/tables_creation.py
-```
-
-Run the pipeline:
-
-```bash
 python main.py
 ```
 
-Launch the dashboard:
+### Option A: Run Both Backend & Frontend Together (Recommended)
+From the root directory (`HybridGuard/`):
 
 ```bash
-streamlit run dashboard.py
+npm run dev
 ```
+
+This concurrently launches:
+- **FastAPI REST API**: `http://127.0.0.1:8000`
+- **React Frontend Console**: `http://localhost:5173`
+
+---
+
+### Option B: Run in Separate Terminals
+
+**Terminal 1 (Backend API)**:
+```bash
+# Must be run from root directory:
+python -m uvicorn backend.api:app --reload --port 8000
+```
+
+**Terminal 2 (React Dashboard)**:
+```bash
+cd priviguard-dashboard
+npm run dev
+```
+
+
 
 
 ---
