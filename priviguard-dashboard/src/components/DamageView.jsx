@@ -15,9 +15,9 @@ export default function DamageView({ damageData, onDisableStatus }) {
   const registry = damageData?.registry || [];
 
   const tierColors = {
-    'Tier 0': '#dc2626',
-    'Tier 1': '#ea580c',
-    'Tier 2': '#0284c7'
+    'Tier 0': '#9f1239',
+    'Tier 1': '#c2410c',
+    'Tier 2': '#0f766e'
   };
 
   return (
@@ -55,18 +55,18 @@ export default function DamageView({ damageData, onDisableStatus }) {
           value={metrics.high_risk_accounts}
           subtitle="Damage score ≥ 60"
           icon={AlertTriangle}
-          accent="cyan"
+          accent="rose"
         />
       </div>
 
       {/* Privilege Tier Distribution Bar Chart */}
       <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-          <div style={{ width: '4px', height: '1.2rem', background: '#dc2626', borderRadius: '2px' }} />
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }} className="title-font">
+          <div style={{ width: '4px', height: '1.2rem', background: '#9f1239', borderRadius: '2px' }} />
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#29181d' }} className="title-font">
             Blast Radius Analysis
           </h3>
-          <span style={{ fontSize: '0.78rem', color: '#64748b', marginLeft: 'auto' }}>
+          <span style={{ fontSize: '0.78rem', color: '#6b5860', marginLeft: 'auto' }}>
             Score based on access tier privilege: Tier 0 (100 pts), Tier 1 (50 pts), Tier 2 (10 pts)
           </span>
         </div>
@@ -74,21 +74,21 @@ export default function DamageView({ damageData, onDisableStatus }) {
         <div style={{ width: '100%', height: 260 }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={tierCounts} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="tier" stroke="#64748b" tick={{ fontSize: 12 }} />
-              <YAxis stroke="#64748b" tick={{ fontSize: 12 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e6ded6" />
+              <XAxis dataKey="tier" stroke="#6b5860" tick={{ fontSize: 12 }} />
+              <YAxis stroke="#6b5860" tick={{ fontSize: 12 }} />
               <Tooltip
                 contentStyle={{
                   backgroundColor: '#ffffff',
-                  borderColor: '#fca5a5',
+                  borderColor: '#fecdd3',
                   borderRadius: '8px',
-                  color: '#0f172a',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                  color: '#29181d',
+                  boxShadow: '0 4px 12px rgba(41, 24, 29, 0.1)'
                 }}
               />
               <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                 {tierCounts.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={tierColors[entry.tier] || '#0284c7'} />
+                  <Cell key={`cell-${index}`} fill={tierColors[entry.tier] || '#0f766e'} />
                 ))}
               </Bar>
             </BarChart>
@@ -99,11 +99,11 @@ export default function DamageView({ damageData, onDisableStatus }) {
       {/* Blast Radius Registry Table */}
       <div className="glass-panel" style={{ padding: '1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
-          <div style={{ width: '4px', height: '1.2rem', background: '#ea580c', borderRadius: '2px' }} />
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }} className="title-font">
+          <div style={{ width: '4px', height: '1.2rem', background: '#c2410c', borderRadius: '2px' }} />
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#29181d' }} className="title-font">
             Blast Radius Registry
           </h3>
-          <span style={{ fontSize: '0.78rem', color: '#64748b', marginLeft: 'auto' }}>
+          <span style={{ fontSize: '0.78rem', color: '#6b5860', marginLeft: 'auto' }}>
             Monitored identities ranked by privilege damage score
           </span>
         </div>
@@ -124,10 +124,10 @@ export default function DamageView({ damageData, onDisableStatus }) {
             <tbody>
               {registry.map((item) => (
                 <tr key={item.identity_id}>
-                  <td style={{ color: '#64748b', fontSize: '0.8rem' }}>
+                  <td style={{ color: '#6b5860', fontSize: '0.8rem' }}>
                     #{item.identity_id}
                   </td>
-                  <td style={{ fontWeight: 600, color: '#0f172a' }}>
+                  <td style={{ fontWeight: 600, color: '#29181d' }}>
                     {item.identity_name}
                   </td>
                   <td>
@@ -136,9 +136,9 @@ export default function DamageView({ damageData, onDisableStatus }) {
                       borderRadius: '4px',
                       fontSize: '0.74rem',
                       fontWeight: 700,
-                      background: item.hr_status === 'DISABLED' ? '#fef2f2' : '#f0fdf4',
-                      color: item.hr_status === 'DISABLED' ? '#dc2626' : '#16a34a',
-                      border: item.hr_status === 'DISABLED' ? '1px solid #fca5a5' : '1px solid #bbf7d0'
+                      background: item.hr_status === 'DISABLED' ? '#fff1f2' : '#f0fdfa',
+                      color: item.hr_status === 'DISABLED' ? '#9f1239' : '#0f766e',
+                      border: item.hr_status === 'DISABLED' ? '1px solid #fecdd3' : '1px solid #ccfbf1'
                     }}>
                       {item.hr_status}
                     </span>
@@ -148,10 +148,10 @@ export default function DamageView({ damageData, onDisableStatus }) {
                       {item.highest_tier_held || 'Tier 2'}
                     </span>
                   </td>
-                  <td style={{ color: '#475569' }}>
+                  <td style={{ color: '#6b5860' }}>
                     {item.days_dormant} days
                   </td>
-                  <td style={{ fontWeight: 800, fontSize: '0.95rem', color: item.damage_score >= 50 ? '#dc2626' : '#0284c7' }}>
+                  <td style={{ fontWeight: 800, fontSize: '0.95rem', color: item.damage_score >= 50 ? '#9f1239' : '#0f766e' }}>
                     {item.damage_score}
                   </td>
                   <td style={{ textAlign: 'right' }}>

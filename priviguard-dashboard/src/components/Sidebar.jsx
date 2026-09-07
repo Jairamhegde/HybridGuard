@@ -21,15 +21,15 @@ export default function Sidebar({ activeTab, setActiveTab, onRefresh, isRefreshi
   return (
     <aside style={{
       width: '260px',
-      background: '#ffffff',
-      borderRight: '1px solid #e2e8f0',
+      background: 'linear-gradient(180deg, #2a141c 0%, #1d0c14 100%)',
+      borderRight: '1px solid #3d1f2b',
       display: 'flex',
       flexDirection: 'column',
       minHeight: '100vh',
       padding: '1.5rem 1rem',
       position: 'sticky',
       top: 0,
-      boxShadow: '2px 0 10px rgba(0,0,0,0.02)'
+      boxShadow: '4px 0 20px rgba(0,0,0,0.15)'
     }}>
       {/* Brand Logo */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2rem', padding: '0 0.5rem' }}>
@@ -37,19 +37,19 @@ export default function Sidebar({ activeTab, setActiveTab, onRefresh, isRefreshi
           width: '36px',
           height: '36px',
           borderRadius: '8px',
-          background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
+          background: 'linear-gradient(135deg, #9f1239 0%, #be123c 100%)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 2px 10px rgba(2, 132, 199, 0.3)'
+          boxShadow: '0 0 15px rgba(225, 29, 72, 0.4)'
         }}>
           <ShieldCheck size={22} color="#ffffff" />
         </div>
         <div>
-          <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }} className="title-font">
+          <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em' }} className="title-font">
             HybridGuard
           </h2>
-          <p style={{ fontSize: '0.7rem', color: '#0284c7', fontWeight: 700, letterSpacing: '0.05em' }}>
+          <p style={{ fontSize: '0.7rem', color: '#fb7185', fontWeight: 700, letterSpacing: '0.05em' }}>
             ISPM CONSOLE
           </p>
         </div>
@@ -57,7 +57,7 @@ export default function Sidebar({ activeTab, setActiveTab, onRefresh, isRefreshi
 
       {/* Navigation Links */}
       <div style={{ flex: 1 }}>
-        <p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.08em', marginBottom: '0.75rem', padding: '0 0.5rem' }}>
+        <p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#886d77', letterSpacing: '0.08em', marginBottom: '0.75rem', padding: '0 0.5rem' }}>
           NAVIGATION
         </p>
 
@@ -77,16 +77,16 @@ export default function Sidebar({ activeTab, setActiveTab, onRefresh, isRefreshi
                   borderRadius: '8px',
                   fontSize: '0.85rem',
                   fontWeight: isActive ? 700 : 500,
-                  color: isActive ? '#0284c7' : '#475569',
-                  background: isActive ? '#e0f2fe' : 'transparent',
-                  border: isActive ? '1px solid #bae6fd' : '1px solid transparent',
+                  color: isActive ? '#fecdd3' : '#a8929b',
+                  background: isActive ? 'rgba(225, 29, 72, 0.2)' : 'transparent',
+                  border: isActive ? '1px solid rgba(225, 29, 72, 0.4)' : '1px solid transparent',
                   cursor: 'pointer',
                   textAlign: 'left',
                   transition: 'all 0.2s ease',
                   width: '100%'
                 }}
               >
-                <Icon size={18} color={isActive ? '#0284c7' : '#64748b'} />
+                <Icon size={18} color={isActive ? '#fb7185' : '#886d77'} />
                 <span>{item.label}</span>
               </button>
             );
@@ -95,12 +95,27 @@ export default function Sidebar({ activeTab, setActiveTab, onRefresh, isRefreshi
       </div>
 
       {/* Refresh Data Footer */}
-      <div style={{ paddingTop: '1.5rem', borderTop: '1px solid #e2e8f0' }}>
+      <div style={{ paddingTop: '1.5rem', borderTop: '1px solid #3d1f2b' }}>
         <button
           onClick={onRefresh}
           disabled={isRefreshing}
-          className="btn-secondary"
-          style={{ width: '100%', justifyContent: 'center', opacity: isRefreshing ? 0.7 : 1 }}
+          style={{
+            width: '100%',
+            justifyContent: 'center',
+            opacity: isRefreshing ? 0.7 : 1,
+            background: 'rgba(61, 31, 43, 0.6)',
+            color: '#f8fafc',
+            border: '1px solid #542b3b',
+            padding: '0.55rem 0.9rem',
+            borderRadius: '6px',
+            fontSize: '0.85rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            transition: 'all 0.2s ease'
+          }}
         >
           <RefreshCw size={15} style={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none' }} />
           <span>{isRefreshing ? 'Refreshing Cache...' : 'Refresh Data Cache'}</span>

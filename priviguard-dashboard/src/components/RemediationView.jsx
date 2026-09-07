@@ -65,7 +65,7 @@ export default function RemediationView({
           value={metrics.medium}
           subtitle="Stale tokens"
           icon={KeyRound}
-          accent="cyan"
+          accent="rose"
         />
       </div>
 
@@ -74,15 +74,15 @@ export default function RemediationView({
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
           {/* Severity Filter */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Filter size={16} color="#64748b" />
-            <span style={{ fontSize: '0.82rem', color: '#475569', fontWeight: 600 }}>Severity:</span>
+            <Filter size={16} color="#6b5860" />
+            <span style={{ fontSize: '0.82rem', color: '#6b5860', fontWeight: 600 }}>Severity:</span>
             <select
               value={selectedSeverity}
               onChange={(e) => setSelectedSeverity(e.target.value)}
               style={{
                 background: '#ffffff',
-                color: '#0f172a',
-                border: '1px solid #cbd5e1',
+                color: '#29181d',
+                border: '1px solid #d8ccc2',
                 borderRadius: '6px',
                 padding: '0.45rem 0.8rem',
                 fontSize: '0.82rem',
@@ -99,7 +99,7 @@ export default function RemediationView({
 
           {/* Search Input */}
           <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
-            <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
+            <Search size={15} color="#9e8a92" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
               placeholder="Search by rule type or description..."
@@ -108,8 +108,8 @@ export default function RemediationView({
               style={{
                 width: '100%',
                 background: '#ffffff',
-                color: '#0f172a',
-                border: '1px solid #cbd5e1',
+                color: '#29181d',
+                border: '1px solid #d8ccc2',
                 borderRadius: '6px',
                 padding: '0.45rem 0.8rem 0.45rem 2.2rem',
                 fontSize: '0.82rem',
@@ -119,7 +119,7 @@ export default function RemediationView({
           </div>
 
           {/* Platform Tabs */}
-          <div style={{ display: 'flex', background: '#f1f5f9', padding: '0.2rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'flex', background: '#faf6f1', padding: '0.2rem', borderRadius: '8px', border: '1px solid #e6ded6' }}>
             {platforms.map(p => (
               <button
                 key={p}
@@ -131,8 +131,8 @@ export default function RemediationView({
                   borderRadius: '6px',
                   border: 'none',
                   background: selectedPlatform === p ? '#ffffff' : 'transparent',
-                  color: selectedPlatform === p ? '#0284c7' : '#64748b',
-                  boxShadow: selectedPlatform === p ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  color: selectedPlatform === p ? '#9f1239' : '#6b5860',
+                  boxShadow: selectedPlatform === p ? '0 1px 3px rgba(41,24,29,0.08)' : 'none',
                   cursor: 'pointer'
                 }}
               >
@@ -146,17 +146,17 @@ export default function RemediationView({
       {/* Policy Incidents Table */}
       <div className="glass-panel" style={{ padding: '1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
-          <div style={{ width: '4px', height: '1.2rem', background: '#dc2626', borderRadius: '2px' }} />
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }} className="title-font">
+          <div style={{ width: '4px', height: '1.2rem', background: '#9f1239', borderRadius: '2px' }} />
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#29181d' }} className="title-font">
             Policy Incidents & Action Backlog
           </h3>
-          <span style={{ fontSize: '0.78rem', color: '#64748b', marginLeft: 'auto' }}>
+          <span style={{ fontSize: '0.78rem', color: '#6b5860', marginLeft: 'auto' }}>
             Showing {filteredIncidents.length} active violations
           </span>
         </div>
 
         {filteredIncidents.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
+          <div style={{ textAlign: 'center', padding: '3rem', color: '#6b5860' }}>
             <p>No security policy incidents match your search filters.</p>
           </div>
         ) : (
@@ -195,10 +195,10 @@ export default function RemediationView({
 
                   return (
                     <tr key={idx}>
-                      <td style={{ fontWeight: 700, color: '#0f172a' }}>
+                      <td style={{ fontWeight: 700, color: '#29181d' }}>
                         {item.rule_type}
                       </td>
-                      <td style={{ color: '#64748b' }}>
+                      <td style={{ color: '#6b5860' }}>
                         #{item.identity_id}
                       </td>
                       <td>
@@ -206,10 +206,10 @@ export default function RemediationView({
                           {item.severity}
                         </span>
                       </td>
-                      <td style={{ fontWeight: 700, color: '#0284c7' }}>
+                      <td style={{ fontWeight: 700, color: '#9f1239' }}>
                         {item.platform || 'N/A'}
                       </td>
-                      <td style={{ fontSize: '0.82rem', color: '#475569', maxWidth: '380px' }}>
+                      <td style={{ fontSize: '0.82rem', color: '#6b5860', maxWidth: '380px' }}>
                         {item.description}
                       </td>
                       <td style={{ textAlign: 'right' }}>

@@ -15,13 +15,13 @@ export default function Header({ pageTitle, pageSubtitle }) {
       alignItems: 'flex-start',
       paddingBottom: '1.25rem',
       marginBottom: '1.75rem',
-      borderBottom: '1px solid #e2e8f0'
+      borderBottom: '1px solid #e6ded6'
     }}>
       <div>
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }} className="title-font">
+        <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#29181d', letterSpacing: '-0.02em' }} className="title-font">
           {pageTitle}
         </h1>
-        <p style={{ fontSize: '0.875rem', color: '#475569', marginTop: '0.2rem' }}>
+        <p style={{ fontSize: '0.875rem', color: '#6b5860', marginTop: '0.2rem' }}>
           {pageSubtitle}
         </p>
       </div>
@@ -31,30 +31,32 @@ export default function Header({ pageTitle, pageSubtitle }) {
           display: 'flex',
           alignItems: 'center',
           gap: '0.5rem',
-          background: '#f1f5f9',
+          background: '#ffffff',
           padding: '0.4rem 0.85rem',
           borderRadius: '20px',
-          border: '1px solid #e2e8f0',
+          border: '1px solid #e6ded6',
           fontSize: '0.78rem',
-          color: '#475569'
+          color: '#6b5860',
+          boxShadow: '0 1px 3px rgba(41,24,29,0.04)'
         }}>
-          <Server size={14} color="#0284c7" />
-          <span>Platforms: <strong style={{ color: '#0f172a' }}>AD · AWS · Okta</strong></span>
+          <Server size={14} color="#9f1239" />
+          <span>Platforms: <strong style={{ color: '#29181d' }}>AD · AWS · Okta</strong></span>
         </div>
 
         <div style={{
           display: 'flex',
           alignItems: 'center',
           gap: '0.5rem',
-          background: '#f1f5f9',
+          background: '#ffffff',
           padding: '0.4rem 0.85rem',
           borderRadius: '20px',
-          border: '1px solid #e2e8f0',
+          border: '1px solid #e6ded6',
           fontSize: '0.78rem',
-          color: '#475569'
+          color: '#6b5860',
+          boxShadow: '0 1px 3px rgba(41,24,29,0.04)'
         }}>
-          <Activity size={14} color="#16a34a" />
-          <span>Status: <strong style={{ color: '#16a34a' }}>Live Watchlist</strong></span>
+          <Activity size={14} color="#0f766e" />
+          <span>Status: <strong style={{ color: '#0f766e' }}>Live Watchlist</strong></span>
         </div>
 
         <div style={{
@@ -62,9 +64,9 @@ export default function Header({ pageTitle, pageSubtitle }) {
           alignItems: 'center',
           gap: '0.4rem',
           fontSize: '0.78rem',
-          color: '#64748b'
+          color: '#9e8a92'
         }}>
-          <Calendar size={14} color="#64748b" />
+          <Calendar size={14} color="#9e8a92" />
           <span>{currentDate}</span>
         </div>
       </div>

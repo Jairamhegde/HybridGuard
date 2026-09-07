@@ -1,15 +1,15 @@
 import React from 'react';
 
-export default function StatCard({ label, value, subtitle, icon: Icon, accent = 'cyan' }) {
+export default function StatCard({ label, value, subtitle, icon: Icon, accent = 'rose' }) {
   const accentColors = {
-    cyan: { text: '#0284c7', border: '#bae6fd', bg: '#f0f9ff' },
-    red: { text: '#dc2626', border: '#fca5a5', bg: '#fef2f2' },
-    orange: { text: '#ea580c', border: '#fdba74', bg: '#fff7ed' },
-    yellow: { text: '#ca8a04', border: '#fde047', bg: '#fefce8' },
-    green: { text: '#16a34a', border: '#bbf7d0', bg: '#f0fdf4' },
+    rose: { text: '#be123c', border: '#fecdd3', bg: '#fff1f2' },
+    red: { text: '#9f1239', border: '#fecdd3', bg: '#fff1f2' },
+    orange: { text: '#c2410c', border: '#ffedd5', bg: '#fff7ed' },
+    yellow: { text: '#b45309', border: '#fef08a', bg: '#fefce8' },
+    green: { text: '#0f766e', border: '#ccfbf1', bg: '#f0fdfa' },
   };
 
-  const style = accentColors[accent] || accentColors.cyan;
+  const style = accentColors[accent] || accentColors.rose;
 
   return (
     <div className="glass-panel glass-panel-hover" style={{
@@ -20,14 +20,14 @@ export default function StatCard({ label, value, subtitle, icon: Icon, accent = 
       alignItems: 'center'
     }}>
       <div>
-        <p style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#64748b', marginBottom: '0.35rem' }}>
+        <p style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6b5860', marginBottom: '0.35rem' }}>
           {label}
         </p>
-        <h3 style={{ fontSize: '1.9rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.1 }} className="title-font">
+        <h3 style={{ fontSize: '1.9rem', fontWeight: 800, color: '#29181d', lineHeight: 1.1 }} className="title-font">
           {value}
         </h3>
         {subtitle && (
-          <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.3rem' }}>
+          <p style={{ fontSize: '0.78rem', color: '#6b5860', marginTop: '0.3rem' }}>
             {subtitle}
           </p>
         )}
