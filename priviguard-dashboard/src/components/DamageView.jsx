@@ -15,9 +15,9 @@ export default function DamageView({ damageData, onDisableStatus }) {
   const registry = damageData?.registry || [];
 
   const tierColors = {
-    'Tier 0': '#ef4444',
-    'Tier 1': '#f97316',
-    'Tier 2': '#38bdf8'
+    'Tier 0': '#dc2626',
+    'Tier 1': '#ea580c',
+    'Tier 2': '#0284c7'
   };
 
   return (
@@ -62,8 +62,8 @@ export default function DamageView({ damageData, onDisableStatus }) {
       {/* Privilege Tier Distribution Bar Chart */}
       <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-          <div style={{ width: '4px', height: '1.2rem', background: '#ef4444', borderRadius: '2px' }} />
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#f8fafc' }} className="title-font">
+          <div style={{ width: '4px', height: '1.2rem', background: '#dc2626', borderRadius: '2px' }} />
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }} className="title-font">
             Blast Radius Analysis
           </h3>
           <span style={{ fontSize: '0.78rem', color: '#64748b', marginLeft: 'auto' }}>
@@ -74,20 +74,21 @@ export default function DamageView({ damageData, onDisableStatus }) {
         <div style={{ width: '100%', height: 260 }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={tierCounts} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="tier" stroke="#64748b" tick={{ fontSize: 12 }} />
               <YAxis stroke="#64748b" tick={{ fontSize: 12 }} />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: '#0f172a',
-                  borderColor: 'rgba(239, 68, 68, 0.4)',
+                  backgroundColor: '#ffffff',
+                  borderColor: '#fca5a5',
                   borderRadius: '8px',
-                  color: '#f8fafc'
+                  color: '#0f172a',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                 }}
               />
               <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                 {tierCounts.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={tierColors[entry.tier] || '#38bdf8'} />
+                  <Cell key={`cell-${index}`} fill={tierColors[entry.tier] || '#0284c7'} />
                 ))}
               </Bar>
             </BarChart>
@@ -98,8 +99,8 @@ export default function DamageView({ damageData, onDisableStatus }) {
       {/* Blast Radius Registry Table */}
       <div className="glass-panel" style={{ padding: '1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
-          <div style={{ width: '4px', height: '1.2rem', background: '#f97316', borderRadius: '2px' }} />
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#f8fafc' }} className="title-font">
+          <div style={{ width: '4px', height: '1.2rem', background: '#ea580c', borderRadius: '2px' }} />
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }} className="title-font">
             Blast Radius Registry
           </h3>
           <span style={{ fontSize: '0.78rem', color: '#64748b', marginLeft: 'auto' }}>
@@ -126,7 +127,7 @@ export default function DamageView({ damageData, onDisableStatus }) {
                   <td style={{ color: '#64748b', fontSize: '0.8rem' }}>
                     #{item.identity_id}
                   </td>
-                  <td style={{ fontWeight: 600, color: '#f8fafc' }}>
+                  <td style={{ fontWeight: 600, color: '#0f172a' }}>
                     {item.identity_name}
                   </td>
                   <td>
@@ -135,8 +136,9 @@ export default function DamageView({ damageData, onDisableStatus }) {
                       borderRadius: '4px',
                       fontSize: '0.74rem',
                       fontWeight: 700,
-                      background: item.hr_status === 'DISABLED' ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)',
-                      color: item.hr_status === 'DISABLED' ? '#fca5a5' : '#6ee7b7'
+                      background: item.hr_status === 'DISABLED' ? '#fef2f2' : '#f0fdf4',
+                      color: item.hr_status === 'DISABLED' ? '#dc2626' : '#16a34a',
+                      border: item.hr_status === 'DISABLED' ? '1px solid #fca5a5' : '1px solid #bbf7d0'
                     }}>
                       {item.hr_status}
                     </span>
@@ -146,10 +148,10 @@ export default function DamageView({ damageData, onDisableStatus }) {
                       {item.highest_tier_held || 'Tier 2'}
                     </span>
                   </td>
-                  <td style={{ color: '#94a3b8' }}>
+                  <td style={{ color: '#475569' }}>
                     {item.days_dormant} days
                   </td>
-                  <td style={{ fontWeight: 800, fontSize: '0.95rem', color: item.damage_score >= 50 ? '#ef4444' : '#38bdf8' }}>
+                  <td style={{ fontWeight: 800, fontSize: '0.95rem', color: item.damage_score >= 50 ? '#dc2626' : '#0284c7' }}>
                     {item.damage_score}
                   </td>
                   <td style={{ textAlign: 'right' }}>

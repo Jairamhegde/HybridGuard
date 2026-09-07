@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Search, Users, UserX, Shield, Clock, Flame } from 'lucide-react';
+import React from 'react';
+import { Search, UserX } from 'lucide-react';
 
 export default function IdentitiesView({ identitiesData, searchIdentities, setSearchIdentities, onDisableStatus }) {
   const identities = identitiesData?.identities || [];
@@ -10,7 +10,7 @@ export default function IdentitiesView({ identitiesData, searchIdentities, setSe
       <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', marginBottom: '2rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyBetween: 'space-between', gap: '1rem' }}>
           <div style={{ position: 'relative', flex: 1 }}>
-            <Search size={16} color="#64748b" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
+            <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
               placeholder="Search identities by name or ID..."
@@ -18,9 +18,9 @@ export default function IdentitiesView({ identitiesData, searchIdentities, setSe
               onChange={(e) => setSearchIdentities(e.target.value)}
               style={{
                 width: '100%',
-                background: '#0f172a',
-                color: '#f8fafc',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
+                background: '#ffffff',
+                color: '#0f172a',
+                border: '1px solid #cbd5e1',
                 borderRadius: '8px',
                 padding: '0.55rem 0.85rem 0.55rem 2.4rem',
                 fontSize: '0.875rem',
@@ -29,8 +29,8 @@ export default function IdentitiesView({ identitiesData, searchIdentities, setSe
             />
           </div>
 
-          <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontWeight: 600 }}>
-            Total Monitored: <span style={{ color: '#38bdf8' }}>{identities.length}</span>
+          <div style={{ fontSize: '0.82rem', color: '#475569', fontWeight: 600 }}>
+            Total Monitored: <span style={{ color: '#0284c7', fontWeight: 800 }}>{identities.length}</span>
           </div>
         </div>
       </div>
@@ -38,8 +38,8 @@ export default function IdentitiesView({ identitiesData, searchIdentities, setSe
       {/* Identities Directory Table */}
       <div className="glass-panel" style={{ padding: '1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
-          <div style={{ width: '4px', height: '1.2rem', background: '#8b5cf6', borderRadius: '2px' }} />
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#f8fafc' }} className="title-font">
+          <div style={{ width: '4px', height: '1.2rem', background: '#7c3aed', borderRadius: '2px' }} />
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }} className="title-font">
             All Monitored Identities Directory
           </h3>
           <span style={{ fontSize: '0.78rem', color: '#64748b', marginLeft: 'auto' }}>
@@ -71,7 +71,7 @@ export default function IdentitiesView({ identitiesData, searchIdentities, setSe
                     <td style={{ color: '#64748b', fontSize: '0.8rem' }}>
                       #{item.identity_id}
                     </td>
-                    <td style={{ fontWeight: 600, color: '#f8fafc' }}>
+                    <td style={{ fontWeight: 600, color: '#0f172a' }}>
                       {item.identity_name}
                     </td>
                     <td>
@@ -80,8 +80,9 @@ export default function IdentitiesView({ identitiesData, searchIdentities, setSe
                         borderRadius: '4px',
                         fontSize: '0.74rem',
                         fontWeight: 700,
-                        background: item.hr_status === 'DISABLED' ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)',
-                        color: item.hr_status === 'DISABLED' ? '#fca5a5' : '#6ee7b7'
+                        background: item.hr_status === 'DISABLED' ? '#fef2f2' : '#f0fdf4',
+                        color: item.hr_status === 'DISABLED' ? '#dc2626' : '#16a34a',
+                        border: item.hr_status === 'DISABLED' ? '1px solid #fca5a5' : '1px solid #bbf7d0'
                       }}>
                         {item.hr_status}
                       </span>
@@ -91,25 +92,25 @@ export default function IdentitiesView({ identitiesData, searchIdentities, setSe
                         {item.highest_tier_held || 'Tier 2'}
                       </span>
                     </td>
-                    <td style={{ color: '#94a3b8' }}>
+                    <td style={{ color: '#475569' }}>
                       {item.days_dormant} days
                     </td>
                     <td>
                       <span style={{
                         fontWeight: 800,
                         fontSize: '0.92rem',
-                        color: isHighRisk ? '#ef4444' : '#38bdf8'
+                        color: isHighRisk ? '#dc2626' : '#0284c7'
                       }}>
                         {item.risk_score ? item.risk_score.toFixed(1) : 0}
                       </span>
                     </td>
-                    <td style={{ color: item.damage_score >= 50 ? '#f97316' : '#94a3b8' }}>
+                    <td style={{ color: item.damage_score >= 50 ? '#ea580c' : '#475569', fontWeight: 600 }}>
                       {item.damage_score}
                     </td>
-                    <td style={{ color: item.dormancy_score >= 50 ? '#eab308' : '#94a3b8' }}>
+                    <td style={{ color: item.dormancy_score >= 50 ? '#ca8a04' : '#475569', fontWeight: 600 }}>
                       {item.dormancy_score}
                     </td>
-                    <td style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                    <td style={{ fontSize: '0.78rem', color: '#475569' }}>
                       {item.risk_factors || '—'}
                     </td>
                     <td style={{ textAlign: 'right' }}>

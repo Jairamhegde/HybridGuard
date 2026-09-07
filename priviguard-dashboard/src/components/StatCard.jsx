@@ -2,11 +2,11 @@ import React from 'react';
 
 export default function StatCard({ label, value, subtitle, icon: Icon, accent = 'cyan' }) {
   const accentColors = {
-    cyan: { text: '#38bdf8', border: 'rgba(56, 189, 248, 0.4)', bg: 'rgba(56, 189, 248, 0.1)' },
-    red: { text: '#ef4444', border: 'rgba(239, 68, 68, 0.4)', bg: 'rgba(239, 68, 68, 0.1)' },
-    orange: { text: '#f97316', border: 'rgba(249, 115, 22, 0.4)', bg: 'rgba(249, 115, 22, 0.1)' },
-    yellow: { text: '#eab308', border: 'rgba(234, 179, 8, 0.4)', bg: 'rgba(234, 179, 8, 0.1)' },
-    green: { text: '#10b981', border: 'rgba(16, 185, 129, 0.4)', bg: 'rgba(16, 185, 129, 0.1)' },
+    cyan: { text: '#0284c7', border: '#bae6fd', bg: '#f0f9ff' },
+    red: { text: '#dc2626', border: '#fca5a5', bg: '#fef2f2' },
+    orange: { text: '#ea580c', border: '#fdba74', bg: '#fff7ed' },
+    yellow: { text: '#ca8a04', border: '#fde047', bg: '#fefce8' },
+    green: { text: '#16a34a', border: '#bbf7d0', bg: '#f0fdf4' },
   };
 
   const style = accentColors[accent] || accentColors.cyan;
@@ -20,10 +20,10 @@ export default function StatCard({ label, value, subtitle, icon: Icon, accent = 
       alignItems: 'center'
     }}>
       <div>
-        <p style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#94a3b8', marginBottom: '0.35rem' }}>
+        <p style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#64748b', marginBottom: '0.35rem' }}>
           {label}
         </p>
-        <h3 style={{ fontSize: '1.9rem', fontWeight: 800, color: '#f8fafc', lineHeight: 1.1 }} className="title-font">
+        <h3 style={{ fontSize: '1.9rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.1 }} className="title-font">
           {value}
         </h3>
         {subtitle && (

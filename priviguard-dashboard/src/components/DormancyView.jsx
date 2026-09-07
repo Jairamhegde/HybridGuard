@@ -57,8 +57,8 @@ export default function DormancyView({ dormancyData }) {
       {/* Dormancy Distribution Chart */}
       <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-          <div style={{ width: '4px', height: '1.2rem', background: '#38bdf8', borderRadius: '2px' }} />
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#f8fafc' }} className="title-font">
+          <div style={{ width: '4px', height: '1.2rem', background: '#0284c7', borderRadius: '2px' }} />
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }} className="title-font">
             Dormancy Distribution
           </h3>
           <span style={{ fontSize: '0.78rem', color: '#64748b', marginLeft: 'auto' }}>
@@ -69,18 +69,19 @@ export default function DormancyView({ dormancyData }) {
         <div style={{ width: '100%', height: 280 }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={distribution} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="range" stroke="#64748b" tick={{ fontSize: 12 }} />
               <YAxis stroke="#64748b" tick={{ fontSize: 12 }} />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: '#0f172a',
-                  borderColor: 'rgba(56, 189, 248, 0.4)',
+                  backgroundColor: '#ffffff',
+                  borderColor: '#bae6fd',
                   borderRadius: '8px',
-                  color: '#f8fafc'
+                  color: '#0f172a',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                 }}
               />
-              <Bar dataKey="count" fill="#38bdf8" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="count" fill="#0284c7" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -89,8 +90,8 @@ export default function DormancyView({ dormancyData }) {
       {/* Heatmap Grid Matrix */}
       <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
-          <div style={{ width: '4px', height: '1.2rem', background: '#eab308', borderRadius: '2px' }} />
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#f8fafc' }} className="title-font">
+          <div style={{ width: '4px', height: '1.2rem', background: '#ca8a04', borderRadius: '2px' }} />
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }} className="title-font">
             Dormancy Heatmap Matrix
           </h3>
           <span style={{ fontSize: '0.78rem', color: '#64748b', marginLeft: 'auto' }}>
@@ -105,20 +106,20 @@ export default function DormancyView({ dormancyData }) {
               <div
                 key={idx}
                 style={{
-                  background: isHighDormant ? 'rgba(239, 68, 68, 0.12)' : 'rgba(30, 41, 59, 0.5)',
-                  border: isHighDormant ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(255, 255, 255, 0.08)',
+                  background: isHighDormant ? '#fef2f2' : '#f8fafc',
+                  border: isHighDormant ? '1px solid #fca5a5' : '1px solid #e2e8f0',
                   borderRadius: '10px',
                   padding: '1rem',
                   textAlign: 'center'
                 }}
               >
-                <div style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>
+                <div style={{ fontSize: '0.75rem', color: '#475569', textTransform: 'uppercase', fontWeight: 700 }}>
                   {cell.tier} · {cell.status}
                 </div>
                 <div style={{
                   fontSize: '1.6rem',
                   fontWeight: 800,
-                  color: isHighDormant ? '#ef4444' : '#38bdf8',
+                  color: isHighDormant ? '#dc2626' : '#0284c7',
                   marginTop: '0.3rem'
                 }}>
                   {cell.avg_days}d
@@ -135,8 +136,8 @@ export default function DormancyView({ dormancyData }) {
       {/* Identity Dormancy Ledger Table */}
       <div className="glass-panel" style={{ padding: '1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
-          <div style={{ width: '4px', height: '1.2rem', background: '#10b981', borderRadius: '2px' }} />
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#f8fafc' }} className="title-font">
+          <div style={{ width: '4px', height: '1.2rem', background: '#16a34a', borderRadius: '2px' }} />
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }} className="title-font">
             Identity Dormancy Ledger
           </h3>
           <span style={{ fontSize: '0.78rem', color: '#64748b', marginLeft: 'auto' }}>
@@ -158,7 +159,7 @@ export default function DormancyView({ dormancyData }) {
             <tbody>
               {ledger.map((item) => (
                 <tr key={item.identity_id}>
-                  <td style={{ fontWeight: 600, color: '#f8fafc' }}>
+                  <td style={{ fontWeight: 600, color: '#0f172a' }}>
                     {item.identity_name}
                   </td>
                   <td>
@@ -167,13 +168,14 @@ export default function DormancyView({ dormancyData }) {
                       borderRadius: '4px',
                       fontSize: '0.74rem',
                       fontWeight: 700,
-                      background: item.hr_status === 'DISABLED' ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)',
-                      color: item.hr_status === 'DISABLED' ? '#fca5a5' : '#6ee7b7'
+                      background: item.hr_status === 'DISABLED' ? '#fef2f2' : '#f0fdf4',
+                      color: item.hr_status === 'DISABLED' ? '#dc2626' : '#16a34a',
+                      border: item.hr_status === 'DISABLED' ? '1px solid #fca5a5' : '1px solid #bbf7d0'
                     }}>
                       {item.hr_status}
                     </span>
                   </td>
-                  <td style={{ fontWeight: 700, color: item.days_dormant >= 60 ? '#ef4444' : '#f8fafc' }}>
+                  <td style={{ fontWeight: 700, color: item.days_dormant >= 60 ? '#dc2626' : '#0f172a' }}>
                     {item.days_dormant} days
                   </td>
                   <td>
@@ -181,7 +183,7 @@ export default function DormancyView({ dormancyData }) {
                       {item.highiest_privilage || 'Tier 2'}
                     </span>
                   </td>
-                  <td style={{ fontWeight: 700, color: item.dormancy_score >= 50 ? '#eab308' : '#94a3b8' }}>
+                  <td style={{ fontWeight: 700, color: item.dormancy_score >= 50 ? '#ca8a04' : '#475569' }}>
                     {item.dormancy_score}
                   </td>
                 </tr>

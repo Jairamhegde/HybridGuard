@@ -15,13 +15,13 @@ export default function Header({ pageTitle, pageSubtitle }) {
       alignItems: 'flex-start',
       paddingBottom: '1.25rem',
       marginBottom: '1.75rem',
-      borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
+      borderBottom: '1px solid #e2e8f0'
     }}>
       <div>
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em' }} className="title-font">
+        <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }} className="title-font">
           {pageTitle}
         </h1>
-        <p style={{ fontSize: '0.875rem', color: '#94a3b8', marginTop: '0.2rem' }}>
+        <p style={{ fontSize: '0.875rem', color: '#475569', marginTop: '0.2rem' }}>
           {pageSubtitle}
         </p>
       </div>
@@ -31,30 +31,30 @@ export default function Header({ pageTitle, pageSubtitle }) {
           display: 'flex',
           alignItems: 'center',
           gap: '0.5rem',
-          background: 'rgba(30, 41, 59, 0.6)',
+          background: '#f1f5f9',
           padding: '0.4rem 0.85rem',
           borderRadius: '20px',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
+          border: '1px solid #e2e8f0',
           fontSize: '0.78rem',
-          color: '#cbd5e1'
+          color: '#475569'
         }}>
-          <Server size={14} color="#38bdf8" />
-          <span>Platforms: <strong style={{ color: '#f8fafc' }}>AD · AWS · Okta</strong></span>
+          <Server size={14} color="#0284c7" />
+          <span>Platforms: <strong style={{ color: '#0f172a' }}>AD · AWS · Okta</strong></span>
         </div>
 
         <div style={{
           display: 'flex',
           alignItems: 'center',
           gap: '0.5rem',
-          background: 'rgba(30, 41, 59, 0.6)',
+          background: '#f1f5f9',
           padding: '0.4rem 0.85rem',
           borderRadius: '20px',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
+          border: '1px solid #e2e8f0',
           fontSize: '0.78rem',
-          color: '#cbd5e1'
+          color: '#475569'
         }}>
-          <Activity size={14} color="#10b981" />
-          <span>Status: <strong style={{ color: '#10b981' }}>Live Watchlist</strong></span>
+          <Activity size={14} color="#16a34a" />
+          <span>Status: <strong style={{ color: '#16a34a' }}>Live Watchlist</strong></span>
         </div>
 
         <div style={{

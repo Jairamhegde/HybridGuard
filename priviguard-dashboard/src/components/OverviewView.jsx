@@ -78,14 +78,14 @@ export default function OverviewView({ overviewData, onDisableStatus, API_BASE_U
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.6) 100%)',
-        border: '1px solid rgba(56, 189, 248, 0.2)'
+        background: 'linear-gradient(135deg, #f8fafc 0%, #e0f2fe 100%)',
+        border: '1px solid #bae6fd'
       }}>
         <div>
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f8fafc', marginBottom: '0.25rem' }} className="title-font">
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.25rem' }} className="title-font">
             Executive Security Posture Report
           </h3>
-          <p style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
+          <p style={{ fontSize: '0.82rem', color: '#475569' }}>
             Generate a full audit summary containing blast radius metrics, dormancy highlights, and critical risk findings.
           </p>
         </div>
@@ -102,8 +102,8 @@ export default function OverviewView({ overviewData, onDisableStatus, API_BASE_U
       {/* Top 10 Risk Identities Table */}
       <div className="glass-panel" style={{ padding: '1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
-          <div style={{ width: '4px', height: '1.2rem', background: '#38bdf8', borderRadius: '2px' }} />
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#f8fafc' }} className="title-font">
+          <div style={{ width: '4px', height: '1.2rem', background: '#0284c7', borderRadius: '2px' }} />
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }} className="title-font">
             Top 10 High Risk Identities
           </h3>
           <span style={{ fontSize: '0.78rem', color: '#64748b', marginLeft: 'auto' }}>
@@ -129,7 +129,7 @@ export default function OverviewView({ overviewData, onDisableStatus, API_BASE_U
                 const isHighRisk = item.risk_score >= 60;
                 return (
                   <tr key={item.identity_id}>
-                    <td style={{ fontWeight: 600, color: '#f8fafc' }}>
+                    <td style={{ fontWeight: 600, color: '#0f172a' }}>
                       {item.identity_name}
                       <span style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 400 }}>
                         ID: #{item.identity_id}
@@ -141,8 +141,9 @@ export default function OverviewView({ overviewData, onDisableStatus, API_BASE_U
                         borderRadius: '4px',
                         fontSize: '0.74rem',
                         fontWeight: 700,
-                        background: item.hr_status === 'DISABLED' ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)',
-                        color: item.hr_status === 'DISABLED' ? '#fca5a5' : '#6ee7b7'
+                        background: item.hr_status === 'DISABLED' ? '#fef2f2' : '#f0fdf4',
+                        color: item.hr_status === 'DISABLED' ? '#dc2626' : '#16a34a',
+                        border: item.hr_status === 'DISABLED' ? '1px solid #fca5a5' : '1px solid #bbf7d0'
                       }}>
                         {item.hr_status}
                       </span>
@@ -151,22 +152,22 @@ export default function OverviewView({ overviewData, onDisableStatus, API_BASE_U
                       <span style={{
                         fontWeight: 800,
                         fontSize: '0.95rem',
-                        color: isHighRisk ? '#ef4444' : '#f59e0b'
+                        color: isHighRisk ? '#dc2626' : '#ca8a04'
                       }}>
                         {item.risk_score ? item.risk_score.toFixed(1) : 0}
                       </span>
                     </td>
                     <td>
-                      <span style={{ color: item.damage_score >= 50 ? '#f97316' : '#94a3b8' }}>
+                      <span style={{ color: item.damage_score >= 50 ? '#ea580c' : '#475569', fontWeight: 600 }}>
                         {item.damage_score}
                       </span>
                     </td>
                     <td>
-                      <span style={{ color: item.dormancy_score >= 50 ? '#eab308' : '#94a3b8' }}>
+                      <span style={{ color: item.dormancy_score >= 50 ? '#ca8a04' : '#475569', fontWeight: 600 }}>
                         {item.dormancy_score}
                       </span>
                     </td>
-                    <td style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                    <td style={{ fontSize: '0.78rem', color: '#475569' }}>
                       {item.risk_factors || '—'}
                     </td>
                     <td style={{ textAlign: 'right' }}>

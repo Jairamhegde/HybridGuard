@@ -18,7 +18,7 @@ export default function ExecutiveReportModal({ reportText, onClose }) {
     <div style={{
       position: 'fixed',
       inset: 0,
-      background: 'rgba(0, 0, 0, 0.75)',
+      background: 'rgba(15, 23, 42, 0.5)',
       backdropFilter: 'blur(6px)',
       display: 'flex',
       alignItems: 'center',
@@ -32,23 +32,24 @@ export default function ExecutiveReportModal({ reportText, onClose }) {
         maxHeight: '85vh',
         display: 'flex',
         flexDirection: 'column',
-        border: '1px solid rgba(56, 189, 248, 0.3)',
-        boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8)',
+        border: '1px solid #bae6fd',
+        boxShadow: '0 20px 50px rgba(0, 0, 0, 0.15)',
         borderRadius: '16px',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        background: '#ffffff'
       }}>
         {/* Header */}
         <div style={{
           padding: '1.25rem 1.5rem',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          borderBottom: '1px solid #e2e8f0',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          background: 'rgba(15, 23, 42, 0.9)'
+          background: '#f8fafc'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <FileText size={20} color="#38bdf8" />
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#f8fafc' }} className="title-font">
+            <FileText size={20} color="#0284c7" />
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }} className="title-font">
               Executive Risk Summary Report
             </h3>
           </div>
@@ -57,7 +58,7 @@ export default function ExecutiveReportModal({ reportText, onClose }) {
             style={{
               background: 'transparent',
               border: 'none',
-              color: '#94a3b8',
+              color: '#64748b',
               cursor: 'pointer',
               padding: '0.2rem',
               borderRadius: '4px'
@@ -72,11 +73,11 @@ export default function ExecutiveReportModal({ reportText, onClose }) {
           <pre style={{
             fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
             fontSize: '0.85rem',
-            color: '#e2e8f0',
-            background: 'rgba(11, 15, 25, 0.9)',
+            color: '#0f172a',
+            background: '#f8fafc',
             padding: '1.25rem',
             borderRadius: '10px',
-            border: '1px solid rgba(255, 255, 255, 0.06)',
+            border: '1px solid #e2e8f0',
             whiteSpace: 'pre-wrap',
             lineHeight: 1.6
           }}>
@@ -87,11 +88,11 @@ export default function ExecutiveReportModal({ reportText, onClose }) {
         {/* Footer actions */}
         <div style={{
           padding: '1rem 1.5rem',
-          borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+          borderTop: '1px solid #e2e8f0',
           display: 'flex',
           justifyContent: 'flex-end',
           gap: '0.75rem',
-          background: 'rgba(15, 23, 42, 0.9)'
+          background: '#f8fafc'
         }}>
           <button onClick={onClose} className="btn-secondary">
             Close
