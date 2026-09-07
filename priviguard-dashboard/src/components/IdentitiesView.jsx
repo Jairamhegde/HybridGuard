@@ -1,8 +1,9 @@
 import React from 'react';
 import { Search, UserX } from 'lucide-react';
 
-export default function IdentitiesView({ identitiesData, searchIdentities, setSearchIdentities, onDisableStatus }) {
+export default function IdentitiesView({ identitiesData, searchIdentities, setSearchIdentities, onDisableStatus, onSelectIdentity }) {
   const identities = identitiesData?.identities || [];
+
 
   return (
     <div>
@@ -71,9 +72,13 @@ export default function IdentitiesView({ identitiesData, searchIdentities, setSe
                     <td style={{ color: '#6b5860', fontSize: '0.8rem' }}>
                       #{item.identity_id}
                     </td>
-                    <td style={{ fontWeight: 600, color: '#29181d' }}>
+                    <td
+                      onClick={() => onSelectIdentity && onSelectIdentity(item.identity_id)}
+                      style={{ fontWeight: 600, color: '#9f1239', cursor: 'pointer' }}
+                    >
                       {item.identity_name}
                     </td>
+
                     <td>
                       <span style={{
                         padding: '0.2rem 0.5rem',

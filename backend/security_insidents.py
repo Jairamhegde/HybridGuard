@@ -414,4 +414,207 @@ def generate_executive_report():
         
     return "\n".join(report)
 
-generate_security_incidents()
+def get_identity_lineage(identity_id: int):
+    conn = connect_db()
+    cursor = conn.cursor()
+
+    # Master HR identity details
+    cursor.execute("""
+        SELECT identity_id, full_name, email, hr_status
+        FROM human_identities
+        WHERE identity_id = ?
+    """, (identity_id,))
+    identity_row = cursor.fetchone()
+
+    if not identity_row:
+        conn.close()
+        return None
+
+    identity_info = {
+        "identity_id": identity_row[0],
+        "full_name": identity_row[1],
+        "email": identity_row[2],
+        "hr_status": identity_row[3],
+    }
+
+    # Fetch risk scores from live_privileged_watchlist if available
+    cursor.execute("""
+        SELECT days_dormant, highest_tier_held
+        FROM live_privileged_watchlist
+        WHERE identity_id = ?
+    """, (identity_id,))
+    watchlist_row = cursor.fetchone()
+    if watchlist_row:
+        identity_info["days_dormant"] = watchlist_row[0]
+        identity_info["highest_tier_held"] = watchlist_row[1]
+    else:
+        identity_info["days_dormant"] = 0
+        identity_info["highest_tier_held"] = "Tier 2"
+
+    # Compute risk score
+    damage_df = damage_score()
+    dormancy_df = dormancy_threat()
+    risk_df = calculate_risk_score(damage_df, dormancy_df)
+    match_risk = risk_df[risk_df["identity_id"] == identity_id]
+    if not match_risk.empty:
+        r = match_risk.iloc[0]
+        identity_info["risk_score"] = float(r["risk_score"])
+        identity_info["damage_score"] = float(r["damage_score"])
+        identity_info["dormancy_score"] = float(r["dormancy_score"])
+        identity_info["risk_factors"] = str(r["risk_factors"])
+    else:
+        identity_info["risk_score"] = 0.0
+        identity_info["damage_score"] = 0.0
+        identity_info["dormancy_score"] = 0.0
+        identity_info["risk_factors"] = ""
+
+    # Fetch platform accounts
+    cursor.execute("""
+        SELECT a.account_id, p.platform_name, a.platform_username, a.account_status,
+               a.token_created_date, a.token_rotated_date, a.last_login_date
+        FROM accounts a
+        JOIN platforms p ON a.platform_id = p.platform_id
+        WHERE a.identity_id = ?
+    """, (identity_id,))
+    accounts_rows = cursor.fetchall()
+
+    accounts = []
+    for acc in accounts_rows:
+        acc_id, platform_name, username, status, created_date, rotated_date, last_login = acc
+        
+        # Roles for this account
+        cursor.execute("""
+            SELECT r.raw_role_name, r.normalized_tier
+            FROM account_role_mapping arm
+            JOIN role_definitions r ON arm.role_id = r.role_id
+            WHERE arm.account_id = ?
+        """, (acc_id,))
+        roles_rows = cursor.fetchall()
+        roles = [{"raw_role_name": r[0], "normalized_tier": r[1]} for r in roles_rows]
+
+        accounts.append({
+            "account_id": acc_id,
+            "platform_name": platform_name,
+            "username": username,
+            "account_status": status,
+            "token_created_date": created_date,
+            "token_rotated_date": rotated_date,
+            "last_login_date": last_login,
+            "roles": roles
+        })
+
+    # Fetch security incidents for this identity
+    cursor.execute("""
+        SELECT incident_type, severity, platform, description, elevated_tier
+        FROM security_incidents
+        WHERE identity_id = ?
+    """, (identity_id,))
+    incident_rows = cursor.fetchall()
+    incidents = [{
+        "incident_type": inc[0],
+        "severity": inc[1],
+        "platform": inc[2],
+        "description": inc[3],
+        "elevated_tier": inc[4]
+    } for inc in incident_rows]
+
+    conn.close()
+    return {
+        "identity": identity_info,
+        "accounts": accounts,
+        "incidents": incidents
+    }
+
+
+def get_graph_data(limit: int = 15):
+    damage_df = damage_score()
+    dormancy_df = dormancy_threat()
+    risk_df = calculate_risk_score(damage_df, dormancy_df)
+    top_identities = risk_df.head(limit)
+
+    conn = connect_db()
+    cursor = conn.cursor()
+
+    nodes = []
+    links = []
+    added_nodes = set()
+
+    for _, id_row in top_identities.iterrows():
+        identity_id = int(id_row["identity_id"])
+        user_node_id = f"user_{identity_id}"
+        
+        if user_node_id not in added_nodes:
+            added_nodes.add(user_node_id)
+            nodes.append({
+                "id": user_node_id,
+                "label": id_row["identity_name"],
+                "type": "identity",
+                "identity_id": identity_id,
+                "status": id_row["hr_status"],
+                "risk_score": float(id_row["risk_score"]),
+                "tier": id_row["highest_tier_held"]
+            })
+
+        # Fetch accounts for this identity
+        cursor.execute("""
+            SELECT a.account_id, p.platform_name, a.platform_username, a.account_status
+            FROM accounts a
+            JOIN platforms p ON a.platform_id = p.platform_id
+            WHERE a.identity_id = ?
+        """, (identity_id,))
+        acc_rows = cursor.fetchall()
+
+        for acc in acc_rows:
+            acc_id, p_name, username, acc_status = acc
+            plat_node_id = f"acc_{acc_id}"
+
+            if plat_node_id not in added_nodes:
+                added_nodes.add(plat_node_id)
+                nodes.append({
+                    "id": plat_node_id,
+                    "label": f"{p_name}: {username}",
+                    "type": "account",
+                    "platform": p_name,
+                    "status": acc_status
+                })
+
+            links.append({
+                "source": user_node_id,
+                "target": plat_node_id,
+                "label": "owns"
+            })
+
+            # Fetch roles for account
+            cursor.execute("""
+                SELECT r.role_id, r.raw_role_name, r.normalized_tier
+                FROM account_role_mapping arm
+                JOIN role_definitions r ON arm.role_id = r.role_id
+                WHERE arm.account_id = ?
+            """, (acc_id,))
+            role_rows = cursor.fetchall()
+
+            for r_row in role_rows:
+                r_id, raw_role, tier = r_row
+                role_node_id = f"role_{p_name}_{r_id}"
+
+                if role_node_id not in added_nodes:
+                    added_nodes.add(role_node_id)
+                    nodes.append({
+                        "id": role_node_id,
+                        "label": f"{raw_role} ({tier})",
+                        "type": "role",
+                        "platform": p_name,
+                        "tier": tier
+                    })
+
+                links.append({
+                    "source": plat_node_id,
+                    "target": role_node_id,
+                    "label": "assigned"
+                })
+
+    conn.close()
+    return {"nodes": nodes, "links": links}
+
+generate_security_incidents()
+

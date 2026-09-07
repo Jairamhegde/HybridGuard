@@ -6,17 +6,20 @@ import {
   CheckSquare, 
   Users, 
   RefreshCw,
-  ShieldCheck
+  ShieldCheck,
+  Network
 } from 'lucide-react';
 
 export default function Sidebar({ activeTab, setActiveTab, onRefresh, isRefreshing }) {
   const navItems = [
     { id: 'overview', label: 'Overall Threat Posture', icon: ShieldAlert },
+    { id: 'graph', label: 'Access Relationship Graph', icon: Network },
     { id: 'dormancy', label: 'Dormancy Analysis', icon: Clock },
     { id: 'damage', label: 'Damage Score', icon: Flame },
     { id: 'remediation', label: 'Remediation Backlog', icon: CheckSquare },
     { id: 'identities', label: 'Identities Directory', icon: Users },
   ];
+
 
   return (
     <aside style={{

@@ -3,7 +3,8 @@ import StatCard from './StatCard';
 import { Flame, ShieldAlert, Shield, AlertTriangle, UserX } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 
-export default function DamageView({ damageData, onDisableStatus }) {
+export default function DamageView({ damageData, onDisableStatus, onSelectIdentity }) {
+
   const metrics = damageData?.metrics || {
     avg_damage_score: 0,
     tier_0_count: 0,
@@ -127,9 +128,13 @@ export default function DamageView({ damageData, onDisableStatus }) {
                   <td style={{ color: '#6b5860', fontSize: '0.8rem' }}>
                     #{item.identity_id}
                   </td>
-                  <td style={{ fontWeight: 600, color: '#29181d' }}>
+                  <td
+                    onClick={() => onSelectIdentity && onSelectIdentity(item.identity_id)}
+                    style={{ fontWeight: 600, color: '#9f1239', cursor: 'pointer' }}
+                  >
                     {item.identity_name}
                   </td>
+
                   <td>
                     <span style={{
                       padding: '0.2rem 0.5rem',

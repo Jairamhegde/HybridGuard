@@ -3,10 +3,11 @@ import StatCard from './StatCard';
 import ExecutiveReportModal from './ExecutiveReportModal';
 import { ShieldAlert, Flame, Clock, Users, FileText, UserX } from 'lucide-react';
 
-export default function OverviewView({ overviewData, onDisableStatus, API_BASE_URL, triggerToast }) {
+export default function OverviewView({ overviewData, onDisableStatus, onSelectIdentity, API_BASE_URL, triggerToast }) {
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportText, setReportText] = useState('');
   const [loadingReport, setLoadingReport] = useState(false);
+
 
   const metrics = overviewData?.metrics || {
     total_incidents: 0,
@@ -129,12 +130,16 @@ export default function OverviewView({ overviewData, onDisableStatus, API_BASE_U
                 const isHighRisk = item.risk_score >= 60;
                 return (
                   <tr key={item.identity_id}>
-                    <td style={{ fontWeight: 600, color: '#29181d' }}>
+                    <td
+                      onClick={() => onSelectIdentity && onSelectIdentity(item.identity_id)}
+                      style={{ fontWeight: 600, color: '#9f1239', cursor: 'pointer' }}
+                    >
                       {item.identity_name}
                       <span style={{ display: 'block', fontSize: '0.72rem', color: '#6b5860', fontWeight: 400 }}>
-                        ID: #{item.identity_id}
+                        ID: #{item.identity_id} (Click to inspect)
                       </span>
                     </td>
+
                     <td>
                       <span style={{
                         padding: '0.2rem 0.5rem',

@@ -14,8 +14,11 @@ from backend.security_insidents import (
     revoke_account_access,
     rotate_account_token,
     revoke_account_tier,
-    generate_executive_report
+    generate_executive_report,
+    get_identity_lineage,
+    get_graph_data
 )
+
 
 app = FastAPI(title="HybridGuard API", version="2.0")
 
@@ -265,6 +268,17 @@ def action_revoke_tier(req: RevokeTierRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/identity/{identity_id}")
+def get_identity_lineage_endpoint(identity_id: int):
+    lineage = get_identity_lineage(identity_id)
+    if not lineage:
+        raise HTTPException(status_code=404, detail="Identity not found")
+    return lineage
+
+@app.get("/api/graph-data")
+def get_graph_data_endpoint(limit: Optional[int] = Query(15)):
+    return get_graph_data(limit=limit)
+
 @app.post("/api/refresh-cache")
 def action_refresh_cache():
     try:
@@ -276,3 +290,4 @@ def action_refresh_cache():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8000)
+

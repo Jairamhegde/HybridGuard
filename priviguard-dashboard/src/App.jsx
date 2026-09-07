@@ -6,6 +6,8 @@ import DormancyView from './components/DormancyView';
 import DamageView from './components/DamageView';
 import RemediationView from './components/RemediationView';
 import IdentitiesView from './components/IdentitiesView';
+import IdentityGraphView from './components/IdentityGraphView';
+import IdentityDrawer from './components/IdentityDrawer';
 import ConfirmModal from './components/ConfirmModal';
 import { CheckCircle } from 'lucide-react';
 
@@ -15,6 +17,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('overview');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
+  const [selectedDrawerIdentityId, setSelectedDrawerIdentityId] = useState(null);
 
   // Confirmation Modal State
   const [modalConfig, setModalConfig] = useState({
@@ -186,7 +189,7 @@ export default function App() {
     setModalConfig({
       isOpen: true,
       title: 'Confirm Status Disabling',
-      message: `Are you sure you want to mark HR status as DISABLED for identity "${identityName}" (ID #${identityId})? This will update cross-platform risk scores and access privileges.`,
+      message: `Are you sure you want to mark HR status as DISABLED for identity "${identityName || '#' + identityId}"? This will update cross-platform risk scores and access privileges.`,
       confirmLabel: 'Confirm Disable',
       isDanger: true,
       onConfirm: () => executeDisableStatus(identityId, identityName)
@@ -236,6 +239,7 @@ export default function App() {
 
   const pageHeadings = {
     overview: { title: 'Overall Threat Posture', subtitle: 'Cross-platform privilege, dormancy & damage metrics summary' },
+    graph: { title: 'Access Relationship Graph', subtitle: 'Visual network diagram connecting HR identities, accounts, and privilege roles' },
     dormancy: { title: 'Dormancy Analysis', subtitle: 'Identity inactivity duration and platform heatmap distribution' },
     damage: { title: 'Damage Score & Blast Radius', subtitle: 'Access tier privilege rating and account blast radius analysis' },
     remediation: { title: 'Remediation Backlog', subtitle: 'Active policy violations and one-click remediation actions' },
@@ -265,8 +269,16 @@ export default function App() {
           <OverviewView
             overviewData={overviewData}
             onDisableStatus={requestDisableStatus}
+            onSelectIdentity={(id) => setSelectedDrawerIdentityId(id)}
             API_BASE_URL={API_BASE_URL}
             triggerToast={triggerToast}
+          />
+        )}
+
+        {activeTab === 'graph' && (
+          <IdentityGraphView
+            API_BASE_URL={API_BASE_URL}
+            onSelectIdentity={(id) => setSelectedDrawerIdentityId(id)}
           />
         )}
 
@@ -278,6 +290,7 @@ export default function App() {
           <DamageView
             damageData={damageData}
             onDisableStatus={requestDisableStatus}
+            onSelectIdentity={(id) => setSelectedDrawerIdentityId(id)}
           />
         )}
 
@@ -298,9 +311,18 @@ export default function App() {
             searchIdentities={searchIdentities}
             setSearchIdentities={setSearchIdentities}
             onDisableStatus={requestDisableStatus}
+            onSelectIdentity={(id) => setSelectedDrawerIdentityId(id)}
           />
         )}
       </main>
+
+      {/* Slide-Over Identity Detail Drawer */}
+      <IdentityDrawer
+        identityId={selectedDrawerIdentityId}
+        onClose={() => setSelectedDrawerIdentityId(null)}
+        onDisableStatus={requestDisableStatus}
+        API_BASE_URL={API_BASE_URL}
+      />
 
       {/* Confirmation Modal */}
       <ConfirmModal
