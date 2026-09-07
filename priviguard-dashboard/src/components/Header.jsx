@@ -55,9 +55,18 @@ export default function Header({ pageTitle, pageSubtitle }) {
           color: '#6b5860',
           boxShadow: '0 1px 3px rgba(41,24,29,0.04)'
         }}>
+          <span style={{
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            background: '#0f766e',
+            boxShadow: '0 0 8px rgba(15, 118, 110, 0.6)',
+            display: 'inline-block'
+          }}></span>
           <Activity size={14} color="#0f766e" />
           <span>Status: <strong style={{ color: '#0f766e' }}>Live Watchlist</strong></span>
         </div>
+
 
         <div style={{
           display: 'flex',
