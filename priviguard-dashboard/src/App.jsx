@@ -6,7 +6,8 @@ import DormancyView from './components/DormancyView';
 import DamageView from './components/DamageView';
 import RemediationView from './components/RemediationView';
 import IdentitiesView from './components/IdentitiesView';
-import { CheckCircle, AlertCircle } from 'lucide-react';
+import ConfirmModal from './components/ConfirmModal';
+import { CheckCircle } from 'lucide-react';
 
 const API_BASE_URL = 'http://127.0.0.1:8000';
 
@@ -14,6 +15,16 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('overview');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
+
+  // Confirmation Modal State
+  const [modalConfig, setModalConfig] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmLabel: '',
+    onConfirm: () => {},
+    isDanger: true
+  });
 
   // View States
   const [overviewData, setOverviewData] = useState(null);
@@ -108,8 +119,8 @@ export default function App() {
     fetchIdentities();
   }, [searchIdentities]);
 
-  // Action Handlers
-  const handleDisableStatus = async (identityId, identityName) => {
+  // Executing Actions after Confirmation
+  const executeDisableStatus = async (identityId, identityName) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/remediation/disable-status`, {
         method: 'POST',
@@ -129,14 +140,13 @@ export default function App() {
     }
   };
 
-  const handleRemediateIncident = async (incident) => {
+  const executeRemediateIncident = async (incident) => {
     const sev = incident.severity?.toUpperCase();
     const identityId = incident.identity_id;
     const platform = incident.platform;
 
     try {
       if (sev === 'CRITICAL') {
-        // Revoke Access / Disable Account
         const res = await fetch(`${API_BASE_URL}/api/remediation/revoke-access`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -146,7 +156,6 @@ export default function App() {
           triggerToast(`Account disabled for identity ID: ${identityId} on ${platform}`);
         }
       } else if (sev === 'HIGH') {
-        // Revoke Tier Access
         const res = await fetch(`${API_BASE_URL}/api/remediation/revoke-tier`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -156,7 +165,6 @@ export default function App() {
           triggerToast(`Elevated tier access revoked for identity ID: ${identityId} on ${platform}`);
         }
       } else if (sev === 'MEDIUM') {
-        // Rotate Token
         const res = await fetch(`${API_BASE_URL}/api/remediation/rotate-token`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -171,6 +179,46 @@ export default function App() {
       console.error("Failed remediation action", err);
       triggerToast("Error executing remediation action.");
     }
+  };
+
+  // Triggers with Confirmation Popup
+  const requestDisableStatus = (identityId, identityName) => {
+    setModalConfig({
+      isOpen: true,
+      title: 'Confirm Status Disabling',
+      message: `Are you sure you want to mark HR status as DISABLED for identity "${identityName}" (ID #${identityId})? This will update cross-platform risk scores and access privileges.`,
+      confirmLabel: 'Confirm Disable',
+      isDanger: true,
+      onConfirm: () => executeDisableStatus(identityId, identityName)
+    });
+  };
+
+  const requestRemediateIncident = (incident) => {
+    const sev = incident.severity?.toUpperCase();
+    let title = 'Confirm Remediation Action';
+    let label = 'Confirm Action';
+    let isDanger = true;
+
+    if (sev === 'CRITICAL') {
+      title = 'Confirm Account Disabling';
+      label = 'Disable User Account';
+    } else if (sev === 'HIGH') {
+      title = 'Confirm Tier Access Revocation';
+      label = 'Revoke Access Tier';
+    } else if (sev === 'MEDIUM') {
+      title = 'Confirm Token Rotation';
+      label = 'Rotate Security Token';
+      isDanger = false;
+    }
+
+    setModalConfig({
+      isOpen: true,
+      title,
+      message: `Are you sure you want to perform "${incident.rule_type}" remediation for identity ID #${incident.identity_id} on ${incident.platform}? Details: ${incident.description}`,
+      confirmLabel: label,
+      isDanger,
+      onConfirm: () => executeRemediateIncident(incident)
+    });
   };
 
   const handleRefreshCache = async () => {
@@ -216,7 +264,7 @@ export default function App() {
         {activeTab === 'overview' && (
           <OverviewView
             overviewData={overviewData}
-            onDisableStatus={handleDisableStatus}
+            onDisableStatus={requestDisableStatus}
             API_BASE_URL={API_BASE_URL}
             triggerToast={triggerToast}
           />
@@ -229,7 +277,7 @@ export default function App() {
         {activeTab === 'damage' && (
           <DamageView
             damageData={damageData}
-            onDisableStatus={handleDisableStatus}
+            onDisableStatus={requestDisableStatus}
           />
         )}
 
@@ -240,7 +288,7 @@ export default function App() {
             setSelectedSeverity={setSelectedSeverity}
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
-            onRemediate={handleRemediateIncident}
+            onRemediate={requestRemediateIncident}
           />
         )}
 
@@ -249,15 +297,26 @@ export default function App() {
             identitiesData={identitiesData}
             searchIdentities={searchIdentities}
             setSearchIdentities={setSearchIdentities}
-            onDisableStatus={handleDisableStatus}
+            onDisableStatus={requestDisableStatus}
           />
         )}
       </main>
 
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        isOpen={modalConfig.isOpen}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        confirmLabel={modalConfig.confirmLabel}
+        isDanger={modalConfig.isDanger}
+        onConfirm={modalConfig.onConfirm}
+        onClose={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}
+      />
+
       {/* Toast Notification Banner */}
       {toastMessage && (
         <div className="toast-banner">
-          <CheckCircle size={18} color="#38bdf8" />
+          <CheckCircle size={18} color="#be123c" />
           <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{toastMessage}</span>
         </div>
       )}
