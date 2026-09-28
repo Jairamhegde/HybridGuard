@@ -135,7 +135,7 @@ for i, name in enumerate(names_list):
         # active users (2 to 20 days ago)
         dormant_days = random.randint(2, 20)
 
-    last_login_dt = datetime(2026, 6, 21) - timedelta(days=dormant_days)
+    last_login_dt = datetime.now() - timedelta(days=dormant_days)
     last_login = last_login_dt.strftime("%Y-%m-%d %H:%M:%S")
     created_date = (last_login_dt - timedelta(days=random.randint(180, 500))).strftime("%Y-%m-%d")
     rotated_date = (last_login_dt - timedelta(days=random.randint(0, 30))).strftime("%Y-%m-%d")

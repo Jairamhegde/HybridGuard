@@ -90,6 +90,31 @@ def process_platform(df, platform_id, prefix, id_col, role_col, user_col, status
                     'raw_role_name': raw_role,
                     'normalized_tier': normalize_role(raw_role)
                 }
+        else:
+            # Unmatched username: identity unknown, assume highest privilege (Tier 0)
+            acc_id = f"{prefix}-{row[id_col]}"
+            accounts_list.append({
+                'account_id': acc_id,
+                'identity_id': None,
+                'platform_id': platform_id,
+                'platform_username': row[user_col],
+                'account_status': row[status_col],
+                'token_usage': row.get('tokenusage', None),
+                'token_created_date': row.get('createdat', None),
+                'token_rotated_date': row.get('rotatedat', None),
+                'last_login_date': None
+            })
+
+            raw_role = row[role_col]
+            role_key = f"{platform_id}_{raw_role}"
+
+            if role_key not in unique_roles:
+                unique_roles[role_key] = {
+                    'role_id': len(unique_roles) + 1,
+                    'platform_id': platform_id,
+                    'raw_role_name': raw_role,
+                    'normalized_tier': 'Tier 0' 
+                }
             
             # Build Account-to-Role Mapping
             role_mappings_list.append({
@@ -159,11 +184,9 @@ def transform_to_3nf(hr_df, aws_df, okta_df, ad_df, audit_df):
     }   
 # _____________________________LOAD_______________________________________________________
 def load_to_database(tables_dict):
-    print("4. Loading data into the SQLite database...")
     conn = connect_db()
     for table_name, dataframe in tables_dict.items():
         dataframe.to_sql(table_name, conn, if_exists='replace', index=False)
-        print(f"   -> Loaded {len(dataframe)} rows into {table_name}")
     conn.close()
    
 def main():
